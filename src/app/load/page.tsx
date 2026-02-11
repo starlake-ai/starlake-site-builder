@@ -7,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 
 export default function LoadPage() {
   const domains = getDomains();
@@ -14,7 +15,8 @@ export default function LoadPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Load</h1>
+        <Breadcrumbs items={[{ label: "Load" }]} />
+        <h1 className="mt-2 text-3xl font-bold tracking-tight">Load</h1>
         <p className="text-muted-foreground mt-2">
           Domains and tables available for load. Select a domain to view its
           tables.

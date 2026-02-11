@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getTransformDomain } from "@/lib/tpch/transform-metadata";
+import {
+  getTransformDomain,
+  getTransformDomains,
+} from "@/lib/tpch/transform-metadata";
 import {
   Card,
   CardContent,
@@ -8,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Breadcrumbs, PrevNextNav } from "@/components/breadcrumbs";
 
 interface PageProps {
   params: Promise<{ domain: string }>;
@@ -18,16 +22,25 @@ export default async function TransformDomainPage({ params }: PageProps) {
   const domain = getTransformDomain(domainSlug);
   if (!domain) notFound();
 
+  const domains = getTransformDomains();
+  const domainIndex = domains.findIndex((d) => d.name === domainSlug);
+  const previousDomain =
+    domainIndex > 0 ? domains[domainIndex - 1] : null;
+  const nextDomain =
+    domainIndex >= 0 && domainIndex < domains.length - 1
+      ? domains[domainIndex + 1]
+      : null;
+
   return (
     <div className="space-y-8">
       <div>
-        <Link
-          href="/transform"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          ← Transform
-        </Link>
-        <h1 className="text-3xl font-bold tracking-tight mt-2 capitalize">
+        <Breadcrumbs
+          items={[
+            { label: "Transform", href: "/transform" },
+            { label: domainSlug },
+          ]}
+        />
+        <h1 className="mt-2 text-3xl font-bold tracking-tight capitalize">
           {domain.name}
         </h1>
         <p className="text-muted-foreground mt-2">
@@ -57,6 +70,20 @@ export default async function TransformDomainPage({ params }: PageProps) {
           </Link>
         ))}
       </div>
+      <PrevNextNav
+        previous={
+          previousDomain && {
+            label: previousDomain.name,
+            href: `/transform/${previousDomain.name}`,
+          }
+        }
+        next={
+          nextDomain && {
+            label: nextDomain.name,
+            href: `/transform/${nextDomain.name}`,
+          }
+        }
+      />
     </div>
   );
 }

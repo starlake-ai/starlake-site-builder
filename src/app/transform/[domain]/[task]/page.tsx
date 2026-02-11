@@ -5,6 +5,7 @@ import {
   getTaskJson,
 } from "@/lib/tpch/transform-metadata";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Breadcrumbs, PrevNextNav } from "@/components/breadcrumbs";
 
 interface PageProps {
   params: Promise<{ domain: string; task: string }>;
@@ -19,27 +20,25 @@ export default async function TransformTaskPage({ params }: PageProps) {
 
   const taskJson = getTaskJson(domainSlug, taskSlug);
 
+  const taskIndex = domain.tasks.findIndex((t) => t.name === taskSlug);
+  const previousTask =
+    taskIndex > 0 ? domain.tasks[taskIndex - 1] : null;
+  const nextTask =
+    taskIndex >= 0 && taskIndex < domain.tasks.length - 1
+      ? domain.tasks[taskIndex + 1]
+      : null;
+
   return (
     <div className="space-y-8">
       <div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Link
-            href="/transform"
-            className="hover:text-foreground transition-colors"
-          >
-            Transform
-          </Link>
-          <span>/</span>
-          <Link
-            href={`/transform/${domainSlug}`}
-            className="hover:text-foreground transition-colors"
-          >
-            {domainSlug}
-          </Link>
-          <span>/</span>
-          <span className="text-foreground font-mono">{taskSlug}</span>
-        </div>
-        <h1 className="text-3xl font-bold tracking-tight mt-2 font-mono">
+        <Breadcrumbs
+          items={[
+            { label: "Transform", href: "/transform" },
+            { label: domainSlug, href: `/transform/${domainSlug}` },
+            { label: taskSlug },
+          ]}
+        />
+        <h1 className="mt-2 text-3xl font-bold tracking-tight font-mono">
           {taskSlug}
         </h1>
         <p className="text-muted-foreground mt-2">
@@ -67,6 +66,20 @@ export default async function TransformTaskPage({ params }: PageProps) {
           </CardContent>
         </Card>
       )}
+      <PrevNextNav
+        previous={
+          previousTask && {
+            label: previousTask.name,
+            href: `/transform/${domainSlug}/${previousTask.name}`,
+          }
+        }
+        next={
+          nextTask && {
+            label: nextTask.name,
+            href: `/transform/${domainSlug}/${nextTask.name}`,
+          }
+        }
+      />
     </div>
   );
 }

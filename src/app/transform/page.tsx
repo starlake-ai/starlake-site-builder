@@ -7,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 
 export default function TransformPage() {
   const domains = getTransformDomains();
@@ -14,7 +15,8 @@ export default function TransformPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Transform</h1>
+        <Breadcrumbs items={[{ label: "Transform" }]} />
+        <h1 className="mt-2 text-3xl font-bold tracking-tight">Transform</h1>
         <p className="text-muted-foreground mt-2">
           Task domains and transforms. Select a domain to view its tasks.
         </p>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDomain, getTableJson } from "@/lib/tpch/load-metadata";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Breadcrumbs, PrevNextNav } from "@/components/breadcrumbs";
 
 interface PageProps {
   params: Promise<{ domain: string; table: string }>;
@@ -16,24 +17,25 @@ export default async function TablePage({ params }: PageProps) {
 
   const tableJson = getTableJson(domainSlug, tableSlug);
 
+  const tableIndex = domain.tables.findIndex((t) => t.name === tableSlug);
+  const previousTable =
+    tableIndex > 0 ? domain.tables[tableIndex - 1] : null;
+  const nextTable =
+    tableIndex >= 0 && tableIndex < domain.tables.length - 1
+      ? domain.tables[tableIndex + 1]
+      : null;
+
   return (
     <div className="space-y-8">
       <div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Link href="/load" className="hover:text-foreground transition-colors">
-            Load
-          </Link>
-          <span>/</span>
-          <Link
-            href={`/load/${domainSlug}`}
-            className="hover:text-foreground transition-colors"
-          >
-            {domainSlug}
-          </Link>
-          <span>/</span>
-          <span className="text-foreground">{tableSlug}</span>
-        </div>
-        <h1 className="text-3xl font-bold tracking-tight mt-2 capitalize">
+        <Breadcrumbs
+          items={[
+            { label: "Load", href: "/load" },
+            { label: domainSlug, href: `/load/${domainSlug}` },
+            { label: tableSlug },
+          ]}
+        />
+        <h1 className="mt-2 text-3xl font-bold tracking-tight capitalize">
           {tableSlug}
         </h1>
         <p className="text-muted-foreground mt-2">
@@ -61,6 +63,20 @@ export default async function TablePage({ params }: PageProps) {
           </CardContent>
         </Card>
       )}
+      <PrevNextNav
+        previous={
+          previousTable && {
+            label: previousTable.name,
+            href: `/load/${domainSlug}/${previousTable.name}`,
+          }
+        }
+        next={
+          nextTable && {
+            label: nextTable.name,
+            href: `/load/${domainSlug}/${nextTable.name}`,
+          }
+        }
+      />
     </div>
   );
 }
