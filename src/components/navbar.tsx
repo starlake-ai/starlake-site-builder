@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Menu } from "lucide-react";
+import { Menu, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
 import { cn } from "@/lib/utils";
@@ -15,7 +15,7 @@ export function Navbar({ onMenuClick, className }: NavbarProps) {
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 flex h-14 items-center gap-4 border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60",
+        "sticky top-0 z-50 flex h-16 items-center gap-4 px-6 glass",
         className
       )}
     >
@@ -30,11 +30,16 @@ export function Navbar({ onMenuClick, className }: NavbarProps) {
       </Button>
       <Link
         href="/"
-        className="flex items-center gap-2 font-semibold text-foreground no-underline transition-opacity hover:opacity-80"
+        className="flex items-center gap-2 font-bold text-lg tracking-tight hover:opacity-90 transition-opacity"
       >
-        TPCH Docs
+        <div className="flex items-center justify-center size-8 rounded-lg bg-primary/10 text-primary ring-1 ring-primary/20">
+          <Zap className="h-5 w-5 fill-current" />
+        </div>
+        <span className="bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
+          TPCH Docs
+        </span>
       </Link>
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex items-center gap-4">
         <ModeToggle />
       </div>
     </header>

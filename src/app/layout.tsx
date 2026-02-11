@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { DocsLayout } from "@/components/docs-layout";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { getDomains } from "@/lib/tpch/load-metadata";
 import { getTransformDomains } from "@/lib/tpch/transform-metadata";
 
@@ -48,12 +49,14 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange={false}
         >
-          <DocsLayout
-            loadDomains={sidebarLoadDomains}
-            transformDomains={sidebarTransformDomains}
-          >
-            {children}
-          </DocsLayout>
+          <TooltipProvider>
+            <DocsLayout
+              loadDomains={sidebarLoadDomains}
+              transformDomains={sidebarTransformDomains}
+            >
+              {children}
+            </DocsLayout>
+          </TooltipProvider>
         </ThemeProvider>
       </body>
     </html>

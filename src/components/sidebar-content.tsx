@@ -2,16 +2,74 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Database, Workflow } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import type { LoadDomain, TransformDomain } from "@/components/sidebar";
+
+const MAX_ITEM_LENGTH = 50;
+
+interface SidebarItemProps {
+  name: string;
+  href: string;
+  isActive: boolean;
+  onClick?: () => void;
+  hasActiveIndicator?: boolean;
+}
+
+const SidebarItem = ({
+  name,
+  href,
+  isActive,
+  onClick,
+  hasActiveIndicator = false,
+}: SidebarItemProps) => {
+  const isTruncated = name.length > MAX_ITEM_LENGTH;
+
+  const content = (
+    <Link
+      href={href}
+      onClick={onClick}
+      className={cn(
+        "relative block min-w-0 rounded-md px-2 py-1 text-sm transition-colors hover:text-primary animate-in slide-in-from-left-2 fade-in duration-300",
+        isActive
+          ? hasActiveIndicator
+            ? "text-primary font-medium bg-primary/5"
+            : "bg-primary/5 text-primary"
+          : "text-foreground/70 hover:bg-primary/5"
+      )}
+    >
+      {isActive && hasActiveIndicator && (
+        <span className="absolute left-0 top-1/2 -translate-x-[calc(0.75rem_+_1px)] -translate-y-1/2 h-4 w-0.5 rounded-full bg-primary" />
+      )}
+      <span className="block truncate w-full">{name}</span>
+    </Link>
+  );
+
+  if (isTruncated) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{content}</TooltipTrigger>
+        <TooltipContent side="right">
+          <p>{name}</p>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return content;
+};
 
 interface SidebarContentProps {
   loadDomains: LoadDomain[];
@@ -53,20 +111,21 @@ export function SidebarContent({
     path === `/transform/${domain}/${task}`;
 
   return (
-    <ScrollArea className="h-full flex-1">
-      <nav className="flex flex-col gap-1 p-3">
-        <Collapsible open={loadOpen} onOpenChange={setLoadOpen}>
-          <div className="flex items-center gap-1">
+    <ScrollArea className="h-full flex-1 py-4 pr-3">
+      <nav className="flex flex-col gap-4 p-3">
+        {/* Load Section */}
+        <Collapsible open={loadOpen} onOpenChange={setLoadOpen} className="group/root">
+          <div className="flex items-center gap-2 px-2 py-1">
             <CollapsibleTrigger asChild>
               <button
                 type="button"
-                className="flex size-7 items-center justify-center rounded-md hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-muted transition-colors"
                 aria-expanded={loadOpen}
               >
                 {loadOpen ? (
-                  <ChevronDown className="size-4" />
+                  <ChevronDown className="size-3.5" />
                 ) : (
-                  <ChevronRight className="size-4" />
+                  <ChevronRight className="size-3.5" />
                 )}
               </button>
             </CollapsibleTrigger>
@@ -74,15 +133,17 @@ export function SidebarContent({
               href="/load"
               onClick={onLinkClick}
               className={cn(
-                "flex-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                isLoadActive && "bg-sidebar-accent text-sidebar-accent-foreground"
+                "flex-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-semibold transition-all duration-200 hover:bg-primary/5 hover:text-primary",
+                isLoadActive ? "bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20" : "text-foreground/80"
               )}
             >
+              <Database className="size-4 shrink-0" />
               Load
             </Link>
           </div>
+          
           <CollapsibleContent className="overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-200">
-            <div className="ml-4 mt-1 flex flex-col gap-0.5 border-l border-sidebar-border pl-3">
+            <div className="ml-2 mt-1 flex flex-col gap-0.5 border-l border-border/40 pl-2">
               {loadDomains.map((domain) => {
                 const domainOpen = openDomains[domain.name] ?? true;
                 return (
@@ -90,12 +151,13 @@ export function SidebarContent({
                     key={domain.name}
                     open={domainOpen}
                     onOpenChange={() => toggleDomain(domain.name)}
+                    className="group/domain animate-in slide-in-from-left-2 fade-in duration-300"
                   >
                     <div className="flex items-center gap-1 py-0.5">
                       <CollapsibleTrigger asChild>
                         <button
                           type="button"
-                          className="flex size-6 items-center justify-center rounded hover:bg-sidebar-accent transition-colors"
+                          className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-muted transition-colors"
                           aria-expanded={domainOpen}
                         >
                           {domainOpen ? (
@@ -105,35 +167,24 @@ export function SidebarContent({
                           )}
                         </button>
                       </CollapsibleTrigger>
-                      <Link
+                      <SidebarItem
+                        name={domain.name}
                         href={`/load/${domain.name}`}
+                        isActive={isDomainActive(domain.name)}
                         onClick={onLinkClick}
-                        title={domain.name}
-                        className={cn(
-                          "min-w-0 flex-1 break-words rounded px-2 py-1 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                          isDomainActive(domain.name) &&
-                            "bg-sidebar-accent text-sidebar-accent-foreground"
-                        )}
-                      >
-                        {domain.name}
-                      </Link>
+                      />
                     </div>
                     <CollapsibleContent className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 overflow-hidden duration-150">
-                      <div className="ml-4 flex flex-col gap-0.5 border-l border-sidebar-border pl-3">
+                      <div className="ml-3 flex flex-col border-l border-border/30 pl-2 pt-0.5 pb-1">
                         {domain.tables.map((table) => (
-                          <Link
+                          <SidebarItem
                             key={table.name}
+                            name={table.name}
                             href={`/load/${domain.name}/${table.name}`}
+                            isActive={isTableActive(domain.name, table.name)}
                             onClick={onLinkClick}
-                            title={table.name}
-                            className={cn(
-                              "block min-w-0 break-words rounded px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                              isTableActive(domain.name, table.name) &&
-                                "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                            )}
-                          >
-                            {table.name}
-                          </Link>
+                            hasActiveIndicator
+                          />
                         ))}
                       </div>
                     </CollapsibleContent>
@@ -144,18 +195,19 @@ export function SidebarContent({
           </CollapsibleContent>
         </Collapsible>
 
-        <Collapsible open={transformOpen} onOpenChange={setTransformOpen}>
-          <div className="flex items-center gap-1">
+        {/* Transform Section */}
+        <Collapsible open={transformOpen} onOpenChange={setTransformOpen} className="group/root">
+          <div className="flex items-center gap-2 px-2 py-1">
             <CollapsibleTrigger asChild>
               <button
                 type="button"
-                className="flex size-7 items-center justify-center rounded-md hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-muted transition-colors"
                 aria-expanded={transformOpen}
               >
                 {transformOpen ? (
-                  <ChevronDown className="size-4" />
+                  <ChevronDown className="size-3.5" />
                 ) : (
-                  <ChevronRight className="size-4" />
+                  <ChevronRight className="size-3.5" />
                 )}
               </button>
             </CollapsibleTrigger>
@@ -163,16 +215,17 @@ export function SidebarContent({
               href="/transform"
               onClick={onLinkClick}
               className={cn(
-                "flex-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                isTransformActive &&
-                  "bg-sidebar-accent text-sidebar-accent-foreground"
+                "flex-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-semibold transition-all duration-200 hover:bg-primary/5 hover:text-primary",
+                isTransformActive ? "bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20" : "text-foreground/80"
               )}
             >
+              <Workflow className="size-4 shrink-0" />
               Transform
             </Link>
           </div>
+
           <CollapsibleContent className="overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-200">
-            <div className="ml-4 mt-1 flex flex-col gap-0.5 border-l border-sidebar-border pl-3">
+            <div className="ml-2 mt-1 flex flex-col gap-0.5 border-l border-border/40 pl-2">
               {transformDomains.map((domain) => {
                 const domainOpen = openTransformDomains[domain.name] ?? true;
                 return (
@@ -180,12 +233,13 @@ export function SidebarContent({
                     key={domain.name}
                     open={domainOpen}
                     onOpenChange={() => toggleTransformDomain(domain.name)}
+                    className="group/domain animate-in slide-in-from-left-2 fade-in duration-300"
                   >
                     <div className="flex items-center gap-1 py-0.5">
                       <CollapsibleTrigger asChild>
                         <button
                           type="button"
-                          className="flex size-6 items-center justify-center rounded hover:bg-sidebar-accent transition-colors"
+                          className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-muted transition-colors"
                           aria-expanded={domainOpen}
                         >
                           {domainOpen ? (
@@ -195,35 +249,24 @@ export function SidebarContent({
                           )}
                         </button>
                       </CollapsibleTrigger>
-                      <Link
+                      <SidebarItem
+                        name={domain.name}
                         href={`/transform/${domain.name}`}
+                        isActive={isTransformDomainActive(domain.name)}
                         onClick={onLinkClick}
-                        title={domain.name}
-                        className={cn(
-                          "min-w-0 flex-1 break-words rounded px-2 py-1 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                          isTransformDomainActive(domain.name) &&
-                            "bg-sidebar-accent text-sidebar-accent-foreground"
-                        )}
-                      >
-                        {domain.name}
-                      </Link>
+                      />
                     </div>
                     <CollapsibleContent className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 overflow-hidden duration-150">
-                      <div className="ml-4 flex flex-col gap-0.5 border-l border-sidebar-border pl-3">
+                      <div className="ml-3 flex flex-col border-l border-border/30 pl-2 pt-0.5 pb-1">
                         {domain.tasks.map((task) => (
-                          <Link
+                          <SidebarItem
                             key={task.name}
+                            name={task.name}
                             href={`/transform/${domain.name}/${task.name}`}
+                            isActive={isTransformTaskActive(domain.name, task.name)}
                             onClick={onLinkClick}
-                            title={task.name}
-                            className={cn(
-                              "block min-w-0 break-words rounded px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                              isTransformTaskActive(domain.name, task.name) &&
-                                "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                            )}
-                          >
-                            {task.name}
-                          </Link>
+                            hasActiveIndicator
+                          />
                         ))}
                       </div>
                     </CollapsibleContent>
