@@ -15,14 +15,14 @@ export function Navbar({ onMenuClick, className }: NavbarProps) {
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 flex h-14 items-center gap-4 border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60",
+        "sticky top-0 z-50 flex h-16 items-center gap-4 border-b border-border/50 bg-background/80 px-6 backdrop-blur-xl shadow-sm",
         className
       )}
     >
       <Button
         variant="ghost"
         size="icon"
-        className="md:hidden"
+        className="md:hidden hover:bg-primary/10"
         onClick={onMenuClick}
         aria-label="Open menu"
       >
@@ -30,11 +30,11 @@ export function Navbar({ onMenuClick, className }: NavbarProps) {
       </Button>
       <Link
         href="/"
-        className="flex items-center gap-2 font-semibold text-foreground no-underline transition-opacity hover:opacity-80"
+        className="flex items-center gap-2 text-lg font-bold text-foreground no-underline transition-all hover:text-primary"
       >
         TPCH Docs
       </Link>
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex items-center gap-3">
         <ModeToggle />
       </div>
     </header>

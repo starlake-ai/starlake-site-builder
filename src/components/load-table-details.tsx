@@ -2,15 +2,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+import { Table as TableIcon } from "lucide-react";
 import ReactFlow, {
   Background,
   Controls,
+  Handle,
   MarkerType,
   Position,
   useEdgesState,
   useNodesState,
 } from "reactflow";
-import type { Edge, Node } from "reactflow";
+import type { Edge, Node, NodeProps } from "reactflow";
 import "reactflow/dist/style.css";
 
 type JsonRecord = Record<string, unknown>;
@@ -47,6 +49,117 @@ interface RelationLink {
   source?: string;
   target?: string;
   relationType?: string;
+}
+
+interface RelationNodeData {
+  domain: string;
+  table: string;
+  columns: string[];
+}
+
+function RelationNode({ data }: NodeProps<RelationNodeData>) {
+  return (
+    <div className="min-w-64 overflow-hidden rounded-lg shadow-lg border-0 bg-[#f5f5f5] dark:bg-card">
+      <div className="relative border-b-2 border-primary bg-primary px-4 py-3 dark:border-muted dark:bg-muted">
+        <div className="text-center text-[11px] font-bold uppercase tracking-wider text-primary-foreground/80 dark:text-muted-foreground">
+          {data.domain}
+        </div>
+        <div className="text-center text-[15px] font-extrabold text-primary-foreground dark:text-foreground mt-0.5">
+          {data.table}
+        </div>
+        <TableIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-foreground/90 dark:text-muted-foreground" />
+      </div>
+      <div className="bg-[#f5f5f5] dark:bg-card">
+        {data.columns.map((column, rowIndex) => (
+          <div
+            key={`${data.domain}.${data.table}.${column}`}
+            className={cn(
+              "relative px-4 py-2 text-left text-[13px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5",
+              rowIndex % 2 === 0 
+                ? "bg-[#eee] dark:bg-card" 
+                : "bg-[#dfdcdc] dark:bg-muted/30"
+            )}
+            style={{ color: "var(--node-text-color)" }}
+          >
+            {(() => {
+              const id = normalizeHandleId(column);
+              return (
+                <>
+                  <Handle
+                    type="target"
+                    position={Position.Left}
+                    id={`t-l:${id}`}
+                    style={{
+                      left: -5,
+                      width: 6,
+                      height: 6,
+                      borderRadius: 0,
+                      background: "#444",
+                      border: "none",
+                    }}
+                  />
+                  <Handle
+                    type="source"
+                    position={Position.Right}
+                    id={`s-r:${id}`}
+                    style={{
+                      right: -5,
+                      width: 6,
+                      height: 6,
+                      borderRadius: 0,
+                      background: "#444",
+                      border: "none",
+                    }}
+                  />
+                  <Handle
+                    type="source"
+                    position={Position.Left}
+                    id={`s-l:${id}`}
+                    style={{
+                      left: -5,
+                      width: 1,
+                      height: 1,
+                      opacity: 0,
+                      border: "none",
+                    }}
+                  />
+                  <Handle
+                    type="target"
+                    position={Position.Right}
+                    id={`t-r:${id}`}
+                    style={{
+                      right: -5,
+                      width: 1,
+                      height: 1,
+                      opacity: 0,
+                      border: "none",
+                    }}
+                  />
+                </>
+              );
+            })()}
+            <span className="text-[#444] dark:text-foreground">{column}</span>
+          </div>
+        ))}
+      </div>
+      <style jsx>{`
+        div {
+          --node-text-color: #444;
+        }
+        :global(.dark) div {
+          --node-text-color: rgb(var(--foreground));
+        }
+      `}</style>
+    </div>
+  );
+}
+
+const relationNodeTypes = {
+  relationNode: RelationNode,
+};
+
+function normalizeHandleId(value?: string): string {
+  return (value ?? "").trim();
 }
 
 export function TableDetails({
@@ -108,93 +221,107 @@ export function TableDetails({
         .filter((item): item is Required<Pick<RelationItem, "id" | "label">> & RelationItem =>
           typeof item?.id === "string" && typeof item?.label === "string"
         )
-        .map((item, index) => ({
-          id: item.id,
-          type: "default",
-          position: {
-            x: 80 + (index % 4) * 280,
-            y: 40 + Math.floor(index / 4) * 180,
-          },
-          data: {
-            label: (
-              <div className="min-w-56 overflow-hidden rounded-md">
-                <div className="border-b border-border bg-muted px-3 py-2">
-                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                    {getDomainAndTable(item.id).domain}
-                  </div>
-                  <div className="text-sm font-semibold text-foreground">
-                    {getDomainAndTable(item.id).table || item.label}
-                  </div>
-                </div>
-                <div>
-                  {(item.columns ?? [])
-                    .filter((column): column is RelationColumn & { name: string } => typeof column?.name === "string")
-                    .map((column, rowIndex) => (
-                      <div
-                        key={column.id ?? column.name}
-                        className={cn(
-                          "flex items-center justify-between px-3 py-1.5 text-[11px]",
-                          rowIndex % 2 === 0 ? "bg-card" : "bg-muted/40"
-                        )}
-                      >
-                        <span className="truncate text-muted-foreground">
-                          {column.name}
-                          {column.columnType ? `:${column.columnType}` : ""}
-                        </span>
-                        {column.primaryKey ? (
-                          <span className="ml-2 shrink-0 font-semibold text-foreground">PK</span>
-                        ) : (
-                          <span className="ml-2 shrink-0 opacity-0">PK</span>
-                        )}
-                      </div>
-                    ))}
-                </div>
-              </div>
-            ),
-          },
-          style: {
-            background: "hsl(var(--card))",
-            color: "hsl(var(--card-foreground))",
-            border: "1px solid hsl(var(--border))",
-            borderRadius: 10,
-            minWidth: 220,
-            padding: 0,
-          },
-          sourcePosition: Position.Right,
-          targetPosition: Position.Left,
-          draggable: true,
-        })),
+        .map((item, index) => {
+          const { domain, table } = getDomainAndTable(item.id);
+          return {
+            id: item.id,
+            type: "relationNode",
+            position: {
+              x: 80 + (index % 3) * 340,
+              y: 40 + Math.floor(index / 3) * 240,
+            },
+            data: {
+              domain,
+              table: table || item.label,
+              columns: (item.columns ?? [])
+                .filter((c): c is RelationColumn & { name: string } => typeof c?.name === "string")
+                .map((c) => c.name),
+            },
+            sourcePosition: Position.Right,
+            targetPosition: Position.Left,
+            draggable: true,
+          };
+        }),
     [relationItems]
   );
 
-  const initialEdges: Edge[] = useMemo(
-    () =>
-      relationLinks
-        .filter((relation) => typeof relation?.source === "string" && typeof relation?.target === "string")
-        .map((relation, index) => {
-          const sourceId = relation.source!.split(".").slice(0, 2).join(".");
-          const targetId = relation.target!.split(".").slice(0, 2).join(".");
-          return {
-            id: `relation-${index}`,
-            source: sourceId,
-            target: targetId,
-            label: relation.relationType,
-            type: "smoothstep",
-            style: { stroke: "hsl(var(--muted-foreground))", strokeWidth: 1.5 },
-            labelStyle: {
-              fill: "hsl(var(--foreground))",
-              fontSize: 11,
-              fontWeight: 500,
-            },
-            labelBgStyle: {
-              fill: "hsl(var(--background))",
-              fillOpacity: 0.9,
-            },
-            markerEnd: { type: MarkerType.ArrowClosed },
-          };
-        }),
-    [relationLinks]
-  );
+  const initialEdges: Edge[] = useMemo(() => {
+    const nodeColumnsById = new Map<string, Set<string>>();
+    const nodeOrderById = new Map<string, number>();
+
+    relationItems.forEach((item) => {
+      if (typeof item.id !== "string") return;
+      nodeOrderById.set(item.id, nodeOrderById.size);
+      const columns = Array.isArray(item.columns) ? item.columns : [];
+      nodeColumnsById.set(
+        item.id,
+        new Set(columns.filter(c => typeof c.name === "string").map((c) => normalizeHandleId(c.name)))
+      );
+    });
+
+    return relationLinks
+      .filter((relation) => typeof relation?.source === "string" && typeof relation?.target === "string")
+      .map((relation, index) => {
+        // source and target in relationLinks are like "domain.table.column"
+        const sourceParts = relation.source!.split(".");
+        const targetParts = relation.target!.split(".");
+        
+        const sourceNodeId = sourceParts.slice(0, 2).join(".");
+        const targetNodeId = targetParts.slice(0, 2).join(".");
+        
+        const sourceColumn = sourceParts[2];
+        const targetColumn = targetParts[2];
+
+        const sourceHandleCandidate = normalizeHandleId(sourceColumn);
+        const targetHandleCandidate = normalizeHandleId(targetColumn);
+
+        const sourceHasHandle = Boolean(
+          sourceHandleCandidate && nodeColumnsById.get(sourceNodeId)?.has(sourceHandleCandidate)
+        );
+        const targetHasHandle = Boolean(
+          targetHandleCandidate && nodeColumnsById.get(targetNodeId)?.has(targetHandleCandidate)
+        );
+
+        const sourceOrder = nodeOrderById.get(sourceNodeId) ?? 0;
+        const targetOrder = nodeOrderById.get(targetNodeId) ?? 0;
+        const isLeftToRight = sourceOrder <= targetOrder;
+
+        const edge: Edge = {
+          id: `relation-${index}`,
+          source: sourceNodeId,
+          target: targetNodeId,
+          label: relation.relationType,
+          type: "smoothstep",
+          style: {
+            stroke: "#777",
+            strokeWidth: 2,
+          },
+          labelStyle: {
+            fill: "rgb(var(--foreground))",
+            fontSize: 10,
+            fontWeight: 600,
+          },
+          labelBgStyle: {
+            fill: "rgb(var(--background))",
+            fillOpacity: 0.8,
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: "#777",
+          },
+          animated: true,
+        };
+
+        if (sourceHasHandle) {
+          edge.sourceHandle = `${isLeftToRight ? "s-r" : "s-l"}:${sourceHandleCandidate}`;
+        }
+        if (targetHasHandle) {
+          edge.targetHandle = `${isLeftToRight ? "t-l" : "t-r"}:${targetHandleCandidate}`;
+        }
+
+        return edge;
+      });
+  }, [relationLinks, relationItems]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -208,18 +335,18 @@ export function TableDetails({
   }, [initialEdges, setEdges]);
 
   return (
-    <div className="space-y-4">
-      <div className="inline-flex rounded-md border bg-muted p-1 text-sm">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <div className="flex flex-wrap items-center rounded-xl bg-muted/80 p-1.5 shadow-inner backdrop-blur-sm border border-border/50 gap-1.5 sm:gap-2 w-fit max-w-full">
         {(["general", "attributes", "relations"] as TabId[]).map((tab) => (
           <button
             key={tab}
             type="button"
             onClick={() => setActiveTab(tab)}
             className={cn(
-              "rounded-sm px-3 py-1.5 text-xs font-medium transition-colors",
+              "relative rounded-lg px-4 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-bold transition-all duration-300 cursor-pointer whitespace-nowrap",
               activeTab === tab
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-background text-foreground shadow-lg ring-1 ring-black/5 dark:ring-white/5"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/40"
             )}
           >
             {TAB_LABELS[tab]}
@@ -228,48 +355,48 @@ export function TableDetails({
       </div>
 
       {activeTab === "general" && (
-        <div className="overflow-hidden rounded-md border bg-muted/40 text-sm">
+        <div className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-lg transition-all duration-300 hover:shadow-xl hover:border-border/80">
           <table className="w-full border-collapse">
-            <thead className="bg-muted/60">
+            <thead className="bg-muted/40 text-left">
               <tr>
-                <th className="w-40 border-b px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground text-left">
+                <th className="w-64 border-b border-border/60 px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80">
                   Property
                 </th>
-                <th className="border-b px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground text-left">
+                <th className="border-b border-border/60 px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80">
                   Value
                 </th>
               </tr>
             </thead>
-            <tbody>
-              <tr>
-                <td className="w-40 border-b px-3 py-2 align-top text-xs font-medium text-foreground">
+            <tbody className="divide-y divide-border/40">
+              <tr className="group hover:bg-muted/20 transition-all duration-200">
+                <td className="w-64 px-6 py-5 align-top text-[13px] font-bold text-foreground/90 group-hover:text-foreground">
                   Table name
                 </td>
-                <td className="border-b px-3 py-2 align-top font-mono text-xs text-muted-foreground">
+                <td className="px-6 py-5 align-top font-mono text-[13px] text-muted-foreground group-hover:text-foreground/80 transition-colors">
                   {String(tableName)}
                 </td>
               </tr>
-              <tr>
-                <td className="w-40 border-b px-3 py-2 align-top text-xs font-medium text-foreground">
+              <tr className="group hover:bg-muted/20 transition-all duration-200">
+                <td className="w-64 px-6 py-5 align-top text-[13px] font-bold text-foreground/90 group-hover:text-foreground">
                   Pattern
                 </td>
-                <td className="border-b px-3 py-2 align-top font-mono text-xs text-muted-foreground">
+                <td className="px-6 py-5 align-top font-mono text-[13px] text-muted-foreground group-hover:text-foreground/80 transition-colors">
                   {pattern ? String(pattern) : "—"}
                 </td>
               </tr>
-              <tr>
-                <td className="w-40 border-b px-3 py-2 align-top text-xs font-medium text-foreground">
+              <tr className="group hover:bg-muted/20 transition-all duration-200">
+                <td className="w-64 px-6 py-5 align-top text-[13px] font-bold text-foreground/90 group-hover:text-foreground">
                   Primary key
                 </td>
-                <td className="border-b px-3 py-2 align-top font-mono text-xs text-muted-foreground">
+                <td className="px-6 py-5 align-top font-mono text-[13px] text-muted-foreground group-hover:text-foreground/80 transition-colors">
                   {primaryKey ? String(primaryKey) : "—"}
                 </td>
               </tr>
-              <tr>
-                <td className="w-40 px-3 py-2 align-top text-xs font-medium text-foreground">
+              <tr className="group hover:bg-muted/20 transition-all duration-200">
+                <td className="w-64 px-6 py-5 align-top text-[13px] font-bold text-foreground/90 group-hover:text-foreground">
                   Tags
                 </td>
-                <td className="px-3 py-2 align-top font-mono text-xs text-muted-foreground">
+                <td className="px-6 py-5 align-top font-mono text-[13px] text-muted-foreground group-hover:text-foreground/80 transition-colors">
                   {tags ? String(tags) : "—"}
                 </td>
               </tr>
@@ -279,36 +406,36 @@ export function TableDetails({
       )}
 
       {activeTab === "attributes" && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {attributes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="py-12 text-center text-sm text-muted-foreground bg-muted/20 rounded-2xl border-2 border-dashed border-border/40">
               No attributes found for this table.
             </p>
           ) : (
-            <div className="relative w-full overflow-auto rounded-md border bg-muted/40">
-              <table className="w-full border-collapse text-left text-sm">
-                <thead className="bg-muted/60">
+            <div className="relative w-full overflow-auto rounded-2xl border border-border/60 bg-card shadow-lg transition-all duration-300 hover:shadow-xl hover:border-border/80">
+              <table className="w-full border-collapse text-left">
+                <thead className="bg-muted/40">
                   <tr>
                     {attributeKeys.map((key) => (
                       <th
                         key={key}
-                        className="border-b px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                        className="border-b border-border/60 px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80"
                       >
                         {key}
                       </th>
                     ))}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-border/40">
                   {attributes.map((attr, index) => (
                     <tr
                       key={index}
-                      className={index % 2 === 0 ? "bg-background" : ""}
+                      className="transition-all duration-200 hover:bg-muted/30"
                     >
                       {attributeKeys.map((key) => (
                         <td
                           key={key}
-                          className="border-b px-3 py-2 align-top text-xs text-muted-foreground"
+                          className="px-6 py-4 align-top text-[13px] text-muted-foreground/90"
                         >
                           {formatCellValue(attr[key])}
                         </td>
@@ -323,16 +450,17 @@ export function TableDetails({
       )}
 
       {activeTab === "relations" && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {!relationsJson || !hasRelationsData ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="py-12 text-center text-sm text-muted-foreground bg-muted/20 rounded-2xl border-2 border-dashed border-border/40">
               No relations found for this table.
             </p>
           ) : (
-            <div className="h-[560px] w-full overflow-hidden rounded-md border bg-background">
+            <div className="h-[700px] w-full overflow-hidden rounded-3xl border border-border/60 bg-background/50 backdrop-blur-sm shadow-2xl transition-all duration-300 hover:border-border/80">
               <ReactFlow
                 nodes={nodes}
                 edges={edges}
+                nodeTypes={relationNodeTypes}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 fitView
@@ -340,12 +468,12 @@ export function TableDetails({
                 maxZoom={1.5}
                 proOptions={{ hideAttribution: true }}
                 style={{
-                  background: "hsl(var(--background))",
-                  color: "hsl(var(--foreground))",
+                  background: "transparent",
+                  color: "rgb(var(--foreground))",
                 }}
               >
-                <Background gap={18} color="hsl(var(--border))" />
-                <Controls />
+                <Background />
+                <Controls className="!bg-background !border-border/50 !shadow-xl rounded-lg overflow-hidden" />
               </ReactFlow>
             </div>
           )}

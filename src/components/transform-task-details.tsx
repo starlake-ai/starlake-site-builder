@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Table as TableIcon } from "lucide-react";
 import CodeMirror from "@uiw/react-codemirror";
 import { sql as sqlLang } from "@codemirror/lang-sql";
 import ReactFlow, {
@@ -63,28 +64,27 @@ interface LineageNodeData {
 
 function LineageNode({ data }: NodeProps<LineageNodeData>) {
   return (
-    <div className="min-w-56 overflow-hidden rounded-md">
-      <div
-        className={cn(
-          "border-b border-border px-3 py-2",
-          data.isTask ? "bg-primary/15" : "bg-muted"
-        )}
-      >
-        <div className="text-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+    <div className="min-w-64 overflow-hidden rounded-lg shadow-lg border-0 bg-[#f5f5f5] dark:bg-card">
+      <div className="relative border-b-2 border-primary bg-primary px-4 py-3 dark:border-muted dark:bg-muted">
+        <div className="text-center text-[11px] font-bold uppercase tracking-wider text-primary-foreground/80 dark:text-muted-foreground">
           {data.domain}
         </div>
-        <div className="text-center text-sm font-semibold text-foreground">
+        <div className="text-center text-[15px] font-extrabold text-primary-foreground dark:text-foreground mt-0.5">
           {data.table}
         </div>
+        <TableIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-foreground/90 dark:text-muted-foreground" />
       </div>
-      <div>
+      <div className="bg-[#f5f5f5] dark:bg-card">
         {data.columns.map((column, rowIndex) => (
           <div
             key={`${data.domain}.${data.table}.${column}`}
             className={cn(
-              "relative px-3 py-1.5 text-left text-[11px] text-muted-foreground",
-              rowIndex % 2 === 0 ? "bg-card" : "bg-muted/40"
+              "relative px-4 py-2 text-left text-[13px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5",
+              rowIndex % 2 === 0 
+                ? "bg-[#eee] dark:bg-card" 
+                : "bg-[#dfdcdc] dark:bg-muted/30"
             )}
+            style={{ color: "var(--node-text-color)" }}
           >
             {(() => {
               const id = normalizeHandleId(column);
@@ -98,8 +98,8 @@ function LineageNode({ data }: NodeProps<LineageNodeData>) {
                       left: -5,
                       width: 6,
                       height: 6,
-                      borderRadius: 999,
-                      background: "hsl(var(--muted-foreground))",
+                      borderRadius: 0,
+                      background: "#444",
                       border: "none",
                     }}
                   />
@@ -111,12 +111,11 @@ function LineageNode({ data }: NodeProps<LineageNodeData>) {
                       right: -5,
                       width: 6,
                       height: 6,
-                      borderRadius: 999,
-                      background: "hsl(var(--muted-foreground))",
+                      borderRadius: 0,
+                      background: "#444",
                       border: "none",
                     }}
                   />
-                  {/* Hidden opposite-side handles let us render edges in both directions reliably. */}
                   <Handle
                     type="source"
                     position={Position.Left}
@@ -144,10 +143,18 @@ function LineageNode({ data }: NodeProps<LineageNodeData>) {
                 </>
               );
             })()}
-            {column}
+            <span className="text-[#444] dark:text-foreground">{column}</span>
           </div>
         ))}
       </div>
+      <style jsx>{`
+        div {
+          --node-text-color: #444;
+        }
+        :global(.dark) div {
+          --node-text-color: rgb(var(--foreground));
+        }
+      `}</style>
     </div>
   );
 }
@@ -233,8 +240,8 @@ export function TransformTaskDetails({
             id: nodeId,
             type: "lineageNode",
             position: {
-              x: 80 + (index % 3) * 320,
-              y: 40 + Math.floor(index / 3) * 220,
+              x: 80 + (index % 3) * 340,
+              y: 40 + Math.floor(index / 3) * 240,
             },
             data: {
               domain: item.domain,
@@ -243,16 +250,6 @@ export function TransformTaskDetails({
               columns: Array.isArray(item.columns)
                 ? item.columns.map((c) => String(c).trim())
                 : [],
-            },
-            style: {
-              background: "hsl(var(--card))",
-              color: "hsl(var(--card-foreground))",
-              border: item.isTask
-                ? "1px solid hsl(var(--primary))"
-                : "1px solid hsl(var(--border))",
-              borderRadius: 10,
-              minWidth: 220,
-              padding: 0,
             },
             sourcePosition: Position.Right,
             targetPosition: Position.Left,
@@ -265,6 +262,7 @@ export function TransformTaskDetails({
   const initialEdges: Edge[] = useMemo(() => {
     const nodeColumnsById = new Map<string, Set<string>>();
     const nodeOrderById = new Map<string, number>();
+    
     lineageTables.forEach((table) => {
       if (typeof table.domain !== "string" || typeof table.table !== "string") return;
       const nodeId = `${table.domain}.${table.table}`;
@@ -289,39 +287,44 @@ export function TransformTaskDetails({
         const target = `${relation.to!.domain}.${relation.to!.table}`;
         const sourceHandleCandidate = normalizeHandleId(relation.from?.column);
         const targetHandleCandidate = normalizeHandleId(relation.to?.column);
+        
         const sourceHasHandle = Boolean(
           sourceHandleCandidate && nodeColumnsById.get(source)?.has(sourceHandleCandidate)
         );
         const targetHasHandle = Boolean(
           targetHandleCandidate && nodeColumnsById.get(target)?.has(targetHandleCandidate)
         );
+        
         const sourceOrder = nodeOrderById.get(source) ?? 0;
         const targetOrder = nodeOrderById.get(target) ?? 0;
         const isLeftToRight = sourceOrder <= targetOrder;
 
-        return {
+        // Build the edge - always create it even if handles aren't available
+        const edge: Edge = {
           id: `lineage-${index}`,
           source,
           target,
-          sourceHandle:
-            sourceHasHandle && sourceHandleCandidate
-              ? `${isLeftToRight ? "s-r" : "s-l"}:${sourceHandleCandidate}`
-              : undefined,
-          targetHandle:
-            targetHasHandle && targetHandleCandidate
-              ? `${isLeftToRight ? "t-l" : "t-r"}:${targetHandleCandidate}`
-              : undefined,
           type: "smoothstep",
           style: {
-            stroke: "hsl(var(--muted-foreground))",
-            strokeWidth: 1.4,
-            strokeDasharray: "4 4",
+            stroke: "#777",
+            strokeWidth: 2,
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            color: "hsl(var(--muted-foreground))",
+            color: "#777",
           },
+          animated: true,
         };
+
+        // Only set handles if they exist
+        if (sourceHasHandle && sourceHandleCandidate) {
+          edge.sourceHandle = `${isLeftToRight ? "s-r" : "s-l"}:${sourceHandleCandidate}`;
+        }
+        if (targetHasHandle && targetHandleCandidate) {
+          edge.targetHandle = `${isLeftToRight ? "t-l" : "t-r"}:${targetHandleCandidate}`;
+        }
+
+        return edge;
       });
   }, [lineageRelations, lineageTables]);
 
@@ -337,18 +340,18 @@ export function TransformTaskDetails({
   }, [initialEdges, setEdges]);
 
   return (
-    <div className="space-y-4">
-      <div className="inline-flex rounded-md border bg-muted p-1 text-sm">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <div className="flex flex-wrap items-center rounded-xl bg-muted/80 p-1.5 shadow-inner backdrop-blur-sm border border-border/50 gap-1.5 sm:gap-2 w-fit max-w-full">
         {(["general", "attributes", "sql", "lineage"] as TabId[]).map((tab) => (
           <button
             key={tab}
             type="button"
             onClick={() => setActiveTab(tab)}
             className={cn(
-              "rounded-sm px-3 py-1.5 text-xs font-medium transition-colors",
+              "relative rounded-lg px-4 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-bold transition-all duration-300 cursor-pointer whitespace-nowrap",
               activeTab === tab
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-background text-foreground shadow-lg ring-1 ring-black/5 dark:ring-white/5"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/40"
             )}
           >
             {TAB_LABELS[tab]}
@@ -357,40 +360,40 @@ export function TransformTaskDetails({
       </div>
 
       {activeTab === "general" && (
-        <div className="overflow-hidden rounded-md border bg-muted/40 text-sm">
+        <div className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-lg transition-all duration-300 hover:shadow-xl hover:border-border/80">
           <table className="w-full border-collapse">
-            <thead className="bg-muted/60">
+            <thead className="bg-muted/40 text-left">
               <tr>
-                <th className="w-40 border-b px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground text-left">
+                <th className="w-64 border-b border-border/60 px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80">
                   Property
                 </th>
-                <th className="border-b px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground text-left">
+                <th className="border-b border-border/60 px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80">
                   Value
                 </th>
               </tr>
             </thead>
-            <tbody>
-              <tr>
-                <td className="w-40 border-b px-3 py-2 align-top text-xs font-medium text-foreground">
+            <tbody className="divide-y divide-border/40">
+              <tr className="group hover:bg-muted/20 transition-all duration-200">
+                <td className="w-64 px-6 py-5 align-top text-[13px] font-bold text-foreground/90 group-hover:text-foreground">
                   Task name
                 </td>
-                <td className="border-b px-3 py-2 align-top font-mono text-xs text-muted-foreground">
+                <td className="px-6 py-5 align-top font-mono text-[13px] text-muted-foreground group-hover:text-foreground/80 transition-colors">
                   {String(taskName)}
                 </td>
               </tr>
-              <tr>
-                <td className="w-40 border-b px-3 py-2 align-top text-xs font-medium text-foreground">
+              <tr className="group hover:bg-muted/20 transition-all duration-200">
+                <td className="w-64 px-6 py-5 align-top text-[13px] font-bold text-foreground/90 group-hover:text-foreground">
                   Write strategy
                 </td>
-                <td className="border-b px-3 py-2 align-top font-mono text-xs text-muted-foreground">
+                <td className="px-6 py-5 align-top font-mono text-[13px] text-muted-foreground group-hover:text-foreground/80 transition-colors">
                   {writeStrategy ?? "—"}
                 </td>
               </tr>
-              <tr>
-                <td className="w-40 px-3 py-2 align-top text-xs font-medium text-foreground">
+              <tr className="group hover:bg-muted/20 transition-all duration-200">
+                <td className="w-64 px-6 py-5 align-top text-[13px] font-bold text-foreground/90 group-hover:text-foreground">
                   Tags
                 </td>
-                <td className="px-3 py-2 align-top font-mono text-xs text-muted-foreground">
+                <td className="px-6 py-5 align-top font-mono text-[13px] text-muted-foreground group-hover:text-foreground/80 transition-colors">
                   {tags ? String(tags) : "—"}
                 </td>
               </tr>
@@ -400,36 +403,36 @@ export function TransformTaskDetails({
       )}
 
       {activeTab === "attributes" && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {attributes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="py-12 text-center text-sm text-muted-foreground bg-muted/20 rounded-2xl border-2 border-dashed border-border/40">
               No attributes found for this task.
             </p>
           ) : (
-            <div className="relative w-full overflow-auto rounded-md border bg-muted/40">
-              <table className="w-full border-collapse text-left text-sm">
-                <thead className="bg-muted/60">
+            <div className="relative w-full overflow-auto rounded-2xl border border-border/60 bg-card shadow-lg transition-all duration-300 hover:shadow-xl hover:border-border/80">
+              <table className="w-full border-collapse text-left">
+                <thead className="bg-muted/40">
                   <tr>
                     {attributeKeys.map((key) => (
                       <th
                         key={key}
-                        className="border-b px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                        className="border-b border-border/60 px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80"
                       >
                         {key}
                       </th>
                     ))}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-border/40">
                   {attributes.map((attr, index) => (
                     <tr
                       key={index}
-                      className={index % 2 === 0 ? "bg-background" : ""}
+                      className="transition-all duration-200 hover:bg-muted/30"
                     >
                       {attributeKeys.map((key) => (
                         <td
                           key={key}
-                          className="border-b px-3 py-2 align-top text-xs text-muted-foreground"
+                          className="px-6 py-4 align-top text-[13px] text-muted-foreground/90"
                         >
                           {formatCellValue(attr[key])}
                         </td>
@@ -444,37 +447,39 @@ export function TransformTaskDetails({
       )}
 
       {activeTab === "sql" && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {sql ? (
-            <ScrollArea className="max-h-[500px] w-full rounded-md border bg-muted/40">
-              <CodeMirror
-                value={sql}
-                extensions={[sqlLang()]}
-                basicSetup={{
-                  highlightActiveLine: false,
-                  highlightActiveLineGutter: false,
-                }}
-                theme={resolvedTheme === "dark" ? "dark" : "light"}
-                editable={false}
-                height="100%"
-                className="text-xs"
-              />
-            </ScrollArea>
+            <div className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-lg transition-all duration-300 hover:shadow-xl hover:border-border/80">
+              <ScrollArea className="max-h-[600px] w-full bg-card">
+                <CodeMirror
+                  value={sql}
+                  extensions={[sqlLang()]}
+                  basicSetup={{
+                    highlightActiveLine: false,
+                    highlightActiveLineGutter: false,
+                  }}
+                  theme={resolvedTheme === "dark" ? "dark" : "light"}
+                  editable={false}
+                  height="100%"
+                  className="text-[13px]"
+                />
+              </ScrollArea>
+            </div>
           ) : (
-            <p className="text-sm text-muted-foreground">
+            <p className="py-12 text-center text-sm text-muted-foreground bg-muted/20 rounded-2xl border-2 border-dashed border-border/40">
               No SQL definition found for this task.
             </p>
           )}
         </div>
       )}
       {activeTab === "lineage" && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {!lineageJson || !hasLineageData ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="py-12 text-center text-sm text-muted-foreground bg-muted/20 rounded-2xl border-2 border-dashed border-border/40">
               No lineage found for this task.
             </p>
           ) : (
-            <div className="h-[560px] w-full overflow-hidden rounded-md border bg-background">
+            <div className="h-[700px] w-full overflow-hidden rounded-3xl border border-border/60 bg-background/50 backdrop-blur-sm shadow-2xl transition-all duration-300 hover:border-border/80">
               <ReactFlow
                 nodes={nodes}
                 edges={edges}
@@ -486,12 +491,12 @@ export function TransformTaskDetails({
                 maxZoom={1.5}
                 proOptions={{ hideAttribution: true }}
                 style={{
-                  background: "hsl(var(--background))",
-                  color: "hsl(var(--foreground))",
+                  background: "transparent",
+                  color: "rgb(var(--foreground))",
                 }}
               >
-                <Background gap={18} color="hsl(var(--border))" />
-                <Controls />
+                <Background />
+                <Controls className="!bg-background !border-border/50 !shadow-xl rounded-lg overflow-hidden" />
               </ReactFlow>
             </div>
           )}
@@ -505,6 +510,17 @@ export function TransformTaskDetails({
         .react-flow__node-default.selectable.selected {
           outline: none !important;
           box-shadow: none !important;
+        }
+        .cm-editor, .cm-scroller {
+          background-color: transparent !important;
+        }
+        .cm-gutters {
+          background-color: transparent !important;
+          border-right: 1px solid rgb(var(--border) / 0.2) !important;
+          color: rgb(var(--muted-foreground)) !important;
+        }
+        .cm-content {
+          color: rgb(var(--foreground)) !important;
         }
       `}</style>
     </div>
