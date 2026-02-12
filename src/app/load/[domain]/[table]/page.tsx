@@ -1,6 +1,9 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getDomain, getTableJson } from "@/lib/tpch/load-metadata";
+import {
+  getDomain,
+  getTableJson,
+  getTableRelationsJson,
+} from "@/lib/tpch/load-metadata";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Breadcrumbs, PrevNextNav } from "@/components/breadcrumbs";
 import { TableDetails } from "@/components/load-table-details";
@@ -17,6 +20,7 @@ export default async function TablePage({ params }: PageProps) {
   if (!tableMeta) notFound();
 
   const tableJson = getTableJson(domainSlug, tableSlug);
+  const tableRelationsJson = getTableRelationsJson(domainSlug, tableSlug);
 
   const tableIndex = domain.tables.findIndex((t) => t.name === tableSlug);
   const previousTable =
@@ -50,7 +54,11 @@ export default async function TablePage({ params }: PageProps) {
             <CardTitle>Table details</CardTitle>
           </CardHeader>
           <CardContent>
-            <TableDetails tableName={tableSlug} tableJson={tableJson} />
+            <TableDetails
+              tableName={tableSlug}
+              tableJson={tableJson}
+              relationsJson={tableRelationsJson}
+            />
           </CardContent>
         </Card>
       )}

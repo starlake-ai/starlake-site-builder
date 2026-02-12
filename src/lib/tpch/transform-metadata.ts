@@ -7,6 +7,12 @@ function getTasksDir(): string | null {
   return path.join(base, "tasks");
 }
 
+function getTasksLineageDir(): string | null {
+  const base = process.env.TPCH_BASE_PATH;
+  if (!base) return null;
+  return path.join(base, "tasks-lineage");
+}
+
 export interface TaskInfo {
   name: string;
   filePath: string;
@@ -103,6 +109,30 @@ export function getTaskJson(
   if (!task || !existsSync(task.filePath)) return null;
   try {
     const raw = readFileSync(task.filePath, "utf-8");
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get lineage JSON content for a domain task from
+ * tasks-lineage/{domain}.{task}-lineage.json.
+ * Returns null if file not found or invalid.
+ */
+export function getTaskLineageJson(
+  domainName: string,
+  taskName: string
+): Record<string, unknown> | null {
+  const tasksLineageDir = getTasksLineageDir();
+  if (!tasksLineageDir || !existsSync(tasksLineageDir)) return null;
+
+  const fileName = `${domainName}.${taskName}-lineage.json`;
+  const filePath = path.join(tasksLineageDir, fileName);
+  if (!existsSync(filePath)) return null;
+
+  try {
+    const raw = readFileSync(filePath, "utf-8");
     return JSON.parse(raw) as Record<string, unknown>;
   } catch {
     return null;

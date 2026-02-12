@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   getTransformDomain,
   getTaskJson,
+  getTaskLineageJson,
 } from "@/lib/tpch/transform-metadata";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Breadcrumbs, PrevNextNav } from "@/components/breadcrumbs";
@@ -20,6 +20,7 @@ export default async function TransformTaskPage({ params }: PageProps) {
   if (!taskMeta) notFound();
 
   const taskJson = getTaskJson(domainSlug, taskSlug);
+  const lineageJson = getTaskLineageJson(domainSlug, taskSlug);
 
   const taskIndex = domain.tasks.findIndex((t) => t.name === taskSlug);
   const previousTask =
@@ -53,7 +54,11 @@ export default async function TransformTaskPage({ params }: PageProps) {
             <CardTitle>Task details</CardTitle>
           </CardHeader>
           <CardContent>
-            <TransformTaskDetails taskName={taskSlug} taskJson={taskJson} />
+            <TransformTaskDetails
+              taskName={taskSlug}
+              taskJson={taskJson}
+              lineageJson={lineageJson}
+            />
           </CardContent>
         </Card>
       )}

@@ -7,6 +7,12 @@ function getTablesDir(): string | null {
   return path.join(base, "tables");
 }
 
+function getTableRelationsDir(): string | null {
+  const base = process.env.TPCH_BASE_PATH;
+  if (!base) return null;
+  return path.join(base, "table-relations");
+}
+
 export interface TableInfo {
   name: string;
   filePath: string;
@@ -97,6 +103,29 @@ export function getTableJson(
   if (!table || !existsSync(table.filePath)) return null;
   try {
     const raw = readFileSync(table.filePath, "utf-8");
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get relation JSON content for a domain table from table-relations/{domain}.{table}-relations.json.
+ * Returns null if file not found or invalid.
+ */
+export function getTableRelationsJson(
+  domainName: string,
+  tableName: string
+): Record<string, unknown> | null {
+  const tableRelationsDir = getTableRelationsDir();
+  if (!tableRelationsDir || !existsSync(tableRelationsDir)) return null;
+
+  const fileName = `${domainName}.${tableName}-relations.json`;
+  const filePath = path.join(tableRelationsDir, fileName);
+  if (!existsSync(filePath)) return null;
+
+  try {
+    const raw = readFileSync(filePath, "utf-8");
     return JSON.parse(raw) as Record<string, unknown>;
   } catch {
     return null;
