@@ -262,7 +262,6 @@ export function TableDetails({
     return relationLinks
       .filter((relation) => typeof relation?.source === "string" && typeof relation?.target === "string")
       .map((relation, index) => {
-        // source and target in relationLinks are like "domain.table.column"
         const sourceParts = relation.source!.split(".");
         const targetParts = relation.target!.split(".");
         

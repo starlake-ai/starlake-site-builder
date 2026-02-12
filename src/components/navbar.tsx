@@ -1,10 +1,12 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
-import { Menu } from "lucide-react";
+import { Menu, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
 import { cn } from "@/lib/utils";
+import { GlobalSearch } from "@/components/global-search";
 
 interface NavbarProps {
   onMenuClick?: () => void;
@@ -30,16 +32,21 @@ export function Navbar({ onMenuClick, className }: NavbarProps) {
       </Button>
       <Link
         href="/"
-        className="flex items-center gap-2 text-lg font-bold text-foreground no-underline transition-all hover:text-primary"
+        className="flex items-center gap-2 text-lg font-bold text-foreground no-underline transition-all hover:text-primary shrink-0"
       >
         <img 
           src="/starlake-logo.png" 
           alt="Starlake Logo" 
           className="h-8 w-8 object-contain dark:invert" 
         />
-        Starlake Docs
+        <span className="hidden sm:inline-block">Starlake Docs</span>
       </Link>
-      <div className="ml-auto flex items-center gap-3">
+
+      <div className="flex-1 flex justify-center max-w-2xl mx-auto px-4">
+        <GlobalSearch />
+      </div>
+
+      <div className="flex items-center gap-3">
         <ModeToggle />
       </div>
     </header>

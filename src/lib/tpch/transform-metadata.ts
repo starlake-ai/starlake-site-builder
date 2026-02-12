@@ -28,9 +28,7 @@ interface TasksJsonItem {
   [key: string]: unknown;
 }
 
-/**
- * Read domains from tasks/tasks.json and discover tasks from files named {domain}.{task}.json.
- */
+
 export function getTransformDomains(): TransformDomainInfo[] {
   const tasksDir = getTasksDir();
   if (!tasksDir || !existsSync(tasksDir)) {
@@ -86,9 +84,7 @@ export function getTransformDomains(): TransformDomainInfo[] {
   return result;
 }
 
-/**
- * Get a single transform domain by name, or null if not found.
- */
+
 export function getTransformDomain(
   domainName: string
 ): TransformDomainInfo | null {
@@ -96,9 +92,7 @@ export function getTransformDomain(
   return domains.find((d) => d.name === domainName) ?? null;
 }
 
-/**
- * Get raw task JSON content for a domain task. Returns null if file not found or invalid.
- */
+
 export function getTaskJson(
   domainName: string,
   taskName: string
@@ -115,11 +109,7 @@ export function getTaskJson(
   }
 }
 
-/**
- * Get lineage JSON content for a domain task from
- * tasks-lineage/{domain}.{task}-lineage.json.
- * Returns null if file not found or invalid.
- */
+
 export function getTaskLineageJson(
   domainName: string,
   taskName: string

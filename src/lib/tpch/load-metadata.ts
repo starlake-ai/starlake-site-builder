@@ -28,9 +28,7 @@ interface DomainsJsonItem {
   [key: string]: unknown;
 }
 
-/**
- * Read domains from tables/domains.json and discover tables from files named {domain}.{table}.json.
- */
+
 export function getDomains(): DomainInfo[] {
   const tablesDir = getTablesDir();
   if (!tablesDir || !existsSync(tablesDir)) {
@@ -82,17 +80,13 @@ export function getDomains(): DomainInfo[] {
   return result;
 }
 
-/**
- * Get a single domain by name, or null if not found.
- */
+
 export function getDomain(domainName: string): DomainInfo | null {
   const domains = getDomains();
   return domains.find((d) => d.name === domainName) ?? null;
 }
 
-/**
- * Get raw table JSON content for a domain table. Returns null if file not found or invalid.
- */
+
 export function getTableJson(
   domainName: string,
   tableName: string
@@ -109,10 +103,7 @@ export function getTableJson(
   }
 }
 
-/**
- * Get relation JSON content for a domain table from table-relations/{domain}.{table}-relations.json.
- * Returns null if file not found or invalid.
- */
+
 export function getTableRelationsJson(
   domainName: string,
   tableName: string

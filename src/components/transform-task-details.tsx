@@ -299,7 +299,6 @@ export function TransformTaskDetails({
         const targetOrder = nodeOrderById.get(target) ?? 0;
         const isLeftToRight = sourceOrder <= targetOrder;
 
-        // Build the edge - always create it even if handles aren't available
         const edge: Edge = {
           id: `lineage-${index}`,
           source,
@@ -316,7 +315,6 @@ export function TransformTaskDetails({
           animated: true,
         };
 
-        // Only set handles if they exist
         if (sourceHasHandle && sourceHandleCandidate) {
           edge.sourceHandle = `${isLeftToRight ? "s-r" : "s-l"}:${sourceHandleCandidate}`;
         }

@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -10,7 +11,6 @@ import {
 } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
 import type { LoadDomain, TransformDomain } from "@/components/sidebar";
 
 interface SidebarContentProps {
@@ -26,12 +26,31 @@ export function SidebarContent({
 }: SidebarContentProps) {
   const pathname = usePathname();
   const path = pathname.replace(/\/$/, "") || "/";
-  const [loadOpen, setLoadOpen] = useState(true);
-  const [transformOpen, setTransformOpen] = useState(true);
+  const [loadOpen, setLoadOpen] = useState(false);
+  const [transformOpen, setTransformOpen] = useState(false);
   const [openDomains, setOpenDomains] = useState<Record<string, boolean>>({});
   const [openTransformDomains, setOpenTransformDomains] = useState<
     Record<string, boolean>
   >({});
+
+  // Auto-expand sidebar sections based on path
+  useEffect(() => {
+    if (path.startsWith("/load")) {
+      setLoadOpen(true);
+      const parts = path.split("/");
+      if (parts.length >= 3) {
+        const domainName = parts[2];
+        setOpenDomains((prev) => ({ ...prev, [domainName]: true }));
+      }
+    } else if (path.startsWith("/transform")) {
+      setTransformOpen(true);
+      const parts = path.split("/");
+      if (parts.length >= 3) {
+        const domainName = parts[2];
+        setOpenTransformDomains((prev) => ({ ...prev, [domainName]: true }));
+      }
+    }
+  }, [path]);
 
   const toggleDomain = (domain: string) => {
     setOpenDomains((prev) => ({ ...prev, [domain]: !prev[domain] }));
@@ -40,7 +59,6 @@ export function SidebarContent({
     setOpenTransformDomains((prev) => ({ ...prev, [domain]: !prev[domain] }));
   };
 
-  // Only the exact current page link is active (selected), not ancestors or siblings
   const isLoadActive = path === "/load";
   const isDomainActive = (domain: string) => path === `/load/${domain}`;
   const isTableActive = (domain: string, table: string) =>
@@ -84,7 +102,7 @@ export function SidebarContent({
           <CollapsibleContent className="overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-300">
             <div className="ml-3.5 mt-1.5 flex flex-col gap-1 border-l border-sidebar-border/60 pl-3">
               {loadDomains.map((domain) => {
-                const domainOpen = openDomains[domain.name] ?? true;
+                const domainOpen = openDomains[domain.name] ?? false;
                 return (
                   <Collapsible
                     key={domain.name}
@@ -174,7 +192,7 @@ export function SidebarContent({
           <CollapsibleContent className="overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-200">
             <div className="ml-3.5 mt-1.5 flex flex-col gap-1 border-l border-sidebar-border/60 pl-3">
               {transformDomains.map((domain) => {
-                const domainOpen = openTransformDomains[domain.name] ?? true;
+                const domainOpen = openTransformDomains[domain.name] ?? false;
                 return (
                   <Collapsible
                     key={domain.name}
@@ -210,7 +228,7 @@ export function SidebarContent({
                     </div>
                     <CollapsibleContent className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 overflow-hidden duration-300">
                       <div className="ml-3 mt-1 flex flex-col gap-0.5 border-l border-sidebar-border/40 pl-3.5">
-                        {domain.tasks.map((task) => (
+                        {domain.tasks.map((task: { name: string }) => (
                           <Link
                             key={task.name}
                             href={`/transform/${domain.name}/${task.name}`}
