@@ -6,6 +6,7 @@ import {
 } from "@/lib/tpch/transform-metadata";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Breadcrumbs, PrevNextNav } from "@/components/breadcrumbs";
+import { TransformTaskDetails } from "@/components/transform-task-details";
 
 interface PageProps {
   params: Promise<{ domain: string; task: string }>;
@@ -49,12 +50,10 @@ export default async function TransformTaskPage({ params }: PageProps) {
       {taskJson && (
         <Card>
           <CardHeader>
-            <CardTitle>Schema & metadata</CardTitle>
+            <CardTitle>Task details</CardTitle>
           </CardHeader>
           <CardContent>
-            <pre className="rounded-lg border bg-muted/50 p-4 text-sm overflow-x-auto">
-              {JSON.stringify(taskJson, null, 2)}
-            </pre>
+            <TransformTaskDetails taskName={taskSlug} taskJson={taskJson} />
           </CardContent>
         </Card>
       )}

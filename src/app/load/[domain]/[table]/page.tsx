@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getDomain, getTableJson } from "@/lib/tpch/load-metadata";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Breadcrumbs, PrevNextNav } from "@/components/breadcrumbs";
+import { TableDetails } from "@/components/load-table-details";
 
 interface PageProps {
   params: Promise<{ domain: string; table: string }>;
@@ -46,12 +47,10 @@ export default async function TablePage({ params }: PageProps) {
       {tableJson && (
         <Card>
           <CardHeader>
-            <CardTitle>Schema & metadata</CardTitle>
+            <CardTitle>Table details</CardTitle>
           </CardHeader>
           <CardContent>
-            <pre className="rounded-lg border bg-muted/50 p-4 text-sm overflow-x-auto">
-              {JSON.stringify(tableJson, null, 2)}
-            </pre>
+            <TableDetails tableName={tableSlug} tableJson={tableJson} />
           </CardContent>
         </Card>
       )}
