@@ -32,7 +32,12 @@ export function Navbar({ onMenuClick, className }: NavbarProps) {
         href="/"
         className="flex items-center gap-2 text-lg font-bold text-foreground no-underline transition-all hover:text-primary"
       >
-        TPCH Docs
+        <img 
+          src="/starlake-logo.png" 
+          alt="Starlake Logo" 
+          className="h-8 w-8 object-contain dark:invert" 
+        />
+        Starlake Docs
       </Link>
       <div className="ml-auto flex items-center gap-3">
         <ModeToggle />

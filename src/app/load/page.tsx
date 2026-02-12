@@ -8,6 +8,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Breadcrumbs } from "@/components/breadcrumbs";
+import { Metadata } from "next";
+import { constructMetadata } from "@/lib/seo-config";
+
+export const metadata: Metadata = constructMetadata({
+  title: "Load Domains",
+  description: "Browse and explore Starlake load domains and table definitions.",
+});
 
 export default function LoadPage() {
   const domains = getDomains();

@@ -13,8 +13,19 @@ import {
 } from "@/components/ui/card";
 import { Breadcrumbs, PrevNextNav } from "@/components/breadcrumbs";
 
+import { Metadata } from "next";
+import { constructMetadata } from "@/lib/seo-config";
+
 interface PageProps {
   params: Promise<{ domain: string }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { domain } = await params;
+  return constructMetadata({
+    title: `${domain} | Transform`,
+    description: `Explore all transformation tasks and data pipelines within the ${domain} domain in Starlake.`,
+  });
 }
 
 export default async function TransformDomainPage({ params }: PageProps) {

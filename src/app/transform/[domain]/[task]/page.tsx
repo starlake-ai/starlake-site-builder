@@ -8,8 +8,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Breadcrumbs, PrevNextNav } from "@/components/breadcrumbs";
 import { TransformTaskDetails } from "@/components/transform-task-details";
 
+import { Metadata } from "next";
+import { constructMetadata } from "@/lib/seo-config";
+
 interface PageProps {
   params: Promise<{ domain: string; task: string }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { domain, task } = await params;
+  return constructMetadata({
+    title: `${task} | Transform | ${domain}`,
+    description: `Analyze the ${task} transformation task in the ${domain} domain. View lineage, SQL, and task dependencies in Starlake.`,
+  });
 }
 
 export default async function TransformTaskPage({ params }: PageProps) {

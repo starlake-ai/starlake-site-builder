@@ -1,3 +1,4 @@
+import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import {
   getDomain,
@@ -8,8 +9,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Breadcrumbs, PrevNextNav } from "@/components/breadcrumbs";
 import { TableDetails } from "@/components/load-table-details";
 
+import { constructMetadata } from "@/lib/seo-config";
+
 interface PageProps {
   params: Promise<{ domain: string; table: string }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { domain, table } = await params;
+  return constructMetadata({
+    title: `${table} | Load | ${domain}`,
+    description: `View details and structure for the ${table} table within the ${domain} domain in Starlake.`,
+  });
 }
 
 export default async function TablePage({ params }: PageProps) {

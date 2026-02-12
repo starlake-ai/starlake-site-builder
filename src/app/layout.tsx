@@ -18,10 +18,9 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "TPCH Docs",
-  description: "Documentation for TPCH load and table definitions",
-};
+import { constructMetadata } from "@/lib/seo-config";
+
+export const metadata: Metadata = constructMetadata();
 
 export default function RootLayout({
   children,
@@ -39,8 +38,30 @@ export default function RootLayout({
     tasks: d.tasks.map((t) => ({ name: t.name })),
   }));
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Starlake Docs",
+    "url": "https://starlake.ai",
+    "description": "Comprehensive documentation for Starlake data integration platform.",
+    "publisher": {
+      "@type": "Organization",
+      "name": "Starlake",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://starlake.ai/starlake-logo.png"
+      }
+    }
+  };
+
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
