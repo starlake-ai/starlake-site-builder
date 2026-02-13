@@ -1,6 +1,4 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
-import { getDomain, getDomains } from "@/lib/tpch/load-metadata";
+import { Breadcrumbs, PrevNextNav } from "@/components/breadcrumbs";
 import {
   Card,
   CardContent,
@@ -8,10 +6,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Breadcrumbs, PrevNextNav } from "@/components/breadcrumbs";
+import { getDomain, getDomains } from "@/lib/metadata/load-metadata";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 
-import { Metadata } from "next";
 import { constructMetadata } from "@/lib/seo-config";
+import { Metadata } from "next";
 
 interface PageProps {
   params: Promise<{ domain: string }>;

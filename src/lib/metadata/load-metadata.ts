@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, existsSync } from "fs";
+import { existsSync, readFileSync, readdirSync } from "fs";
 import path from "path";
 
 function getTablesDir(): string | null {
@@ -28,21 +28,20 @@ interface DomainsJsonItem {
   [key: string]: unknown;
 }
 
-
 export function getDomains(): DomainInfo[] {
   const tablesDir = getTablesDir();
   if (!tablesDir || !existsSync(tablesDir)) {
     if (!process.env.SITE_BASE_PATH) {
       console.warn("SITE_BASE_PATH environment variable is not set");
     } else {
-      console.warn(`TPCH tables directory not found: ${tablesDir}`);
+      console.warn(`Tables directory not found: ${tablesDir}`);
     }
     return [];
   }
 
   const domainsPath = path.join(tablesDir, "domains.json");
   if (!existsSync(domainsPath)) {
-    console.warn(`TPCH domains.json not found: ${domainsPath}`);
+    console.warn(`domains.json not found: ${domainsPath}`);
     return [];
   }
 
@@ -84,12 +83,10 @@ export function getDomains(): DomainInfo[] {
   return result;
 }
 
-
 export function getDomain(domainName: string): DomainInfo | null {
   const domains = getDomains();
   return domains.find((d) => d.name === domainName) ?? null;
 }
-
 
 export function getTableJson(
   domainName: string,
@@ -106,7 +103,6 @@ export function getTableJson(
     return null;
   }
 }
-
 
 export function getTableRelationsJson(
   domainName: string,

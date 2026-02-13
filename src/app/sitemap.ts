@@ -1,6 +1,6 @@
+import { getDomains } from '@/lib/metadata/load-metadata';
+import { getTransformDomains } from '@/lib/metadata/transform-metadata';
 import { MetadataRoute } from 'next';
-import { getDomains } from '@/lib/tpch/load-metadata';
-import { getTransformDomains } from '@/lib/tpch/transform-metadata';
 
 const BASE_URL = 'https://starlake.ai';
 

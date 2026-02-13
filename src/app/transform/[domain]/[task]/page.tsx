@@ -1,15 +1,15 @@
-import { notFound } from "next/navigation";
-import {
-  getTransformDomain,
-  getTaskJson,
-  getTaskLineageJson,
-} from "@/lib/tpch/transform-metadata";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Breadcrumbs, PrevNextNav } from "@/components/breadcrumbs";
 import { TransformTaskDetails } from "@/components/transform-task-details";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  getTaskJson,
+  getTaskLineageJson,
+  getTransformDomain,
+} from "@/lib/metadata/transform-metadata";
+import { notFound } from "next/navigation";
 
-import { Metadata } from "next";
 import { constructMetadata } from "@/lib/seo-config";
+import { Metadata } from "next";
 
 interface PageProps {
   params: Promise<{ domain: string; task: string }>;

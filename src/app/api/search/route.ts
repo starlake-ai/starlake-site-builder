@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
 import { buildSearchIndex, searchIndex } from "@/lib/search";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
   try {

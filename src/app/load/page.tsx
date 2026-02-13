@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { getDomains } from "@/lib/tpch/load-metadata";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 import {
   Card,
   CardContent,
@@ -7,9 +6,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Breadcrumbs } from "@/components/breadcrumbs";
-import { Metadata } from "next";
+import { getDomains } from "@/lib/metadata/load-metadata";
 import { constructMetadata } from "@/lib/seo-config";
+import { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = constructMetadata({
   title: "Load Domains",

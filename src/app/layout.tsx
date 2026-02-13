@@ -1,7 +1,7 @@
 import { DocsLayout } from "@/components/docs-layout";
 import { ThemeProvider } from "@/components/theme-provider";
-import { getDomains } from "@/lib/tpch/load-metadata";
-import { getTransformDomains } from "@/lib/tpch/transform-metadata";
+import { getDomains } from "@/lib/metadata/load-metadata";
+import { getTransformDomains } from "@/lib/metadata/transform-metadata";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";

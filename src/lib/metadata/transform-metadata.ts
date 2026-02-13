@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, existsSync } from "fs";
+import { existsSync, readFileSync, readdirSync } from "fs";
 import path from "path";
 
 function getTasksDir(): string | null {
@@ -28,21 +28,20 @@ interface TasksJsonItem {
   [key: string]: unknown;
 }
 
-
 export function getTransformDomains(): TransformDomainInfo[] {
   const tasksDir = getTasksDir();
   if (!tasksDir || !existsSync(tasksDir)) {
     if (!process.env.SITE_BASE_PATH) {
       console.warn("SITE_BASE_PATH environment variable is not set");
     } else {
-      console.warn(`TPCH tasks directory not found: ${tasksDir}`);
+      console.warn(`Tasks directory not found: ${tasksDir}`);
     }
     return [];
   }
 
   const tasksJsonPath = path.join(tasksDir, "tasks.json");
   if (!existsSync(tasksJsonPath)) {
-    console.warn(`TPCH tasks.json not found: ${tasksJsonPath}`);
+    console.warn(`tasks.json not found: ${tasksJsonPath}`);
     return [];
   }
 
@@ -88,14 +87,12 @@ export function getTransformDomains(): TransformDomainInfo[] {
   return result;
 }
 
-
 export function getTransformDomain(
   domainName: string
 ): TransformDomainInfo | null {
   const domains = getTransformDomains();
   return domains.find((d) => d.name === domainName) ?? null;
 }
-
 
 export function getTaskJson(
   domainName: string,
@@ -112,7 +109,6 @@ export function getTaskJson(
     return null;
   }
 }
-
 
 export function getTaskLineageJson(
   domainName: string,

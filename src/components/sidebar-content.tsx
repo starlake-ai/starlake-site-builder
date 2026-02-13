@@ -1,9 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import type { LoadDomain, TransformDomain } from "@/components/sidebar";
 import {
   Collapsible,
   CollapsibleContent,
@@ -11,7 +8,10 @@ import {
 } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import type { LoadDomain, TransformDomain } from "@/components/sidebar";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 interface SidebarContentProps {
   loadDomains: LoadDomain[];
@@ -128,7 +128,7 @@ export function SidebarContent({
                         onClick={onLinkClick}
                         title={domain.name}
                         className={cn(
-                          "min-w-0 flex-1 break-words rounded-lg px-3 py-1.5 text-sm font-semibold transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                          "min-w-0 flex-1 wrap-break-word rounded-lg px-3 py-1.5 text-sm font-semibold transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                           isDomainActive(domain.name) ?
                             "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                         )}
@@ -145,7 +145,7 @@ export function SidebarContent({
                             onClick={onLinkClick}
                             title={table.name}
                             className={cn(
-                              "block min-w-0 break-words rounded-lg px-3 py-1.5 text-[13px] transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                              "block min-w-0 wrap-break-word rounded-lg px-3 py-1.5 text-[13px] transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                               isTableActive(domain.name, table.name)
                                 ? "bg-sidebar-accent/80 text-sidebar-accent-foreground font-bold shadow-sm"
                                 : "text-muted-foreground/80 hover:text-foreground"
@@ -218,7 +218,7 @@ export function SidebarContent({
                         onClick={onLinkClick}
                         title={domain.name}
                         className={cn(
-                          "min-w-0 flex-1 break-words rounded-lg px-3 py-1.5 text-sm font-semibold transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                          "min-w-0 flex-1 wrap-break-word rounded-lg px-3 py-1.5 text-sm font-semibold transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                           isTransformDomainActive(domain.name) ?
                             "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                         )}
@@ -235,7 +235,7 @@ export function SidebarContent({
                             onClick={onLinkClick}
                             title={task.name}
                             className={cn(
-                              "block min-w-0 break-words rounded-lg px-3 py-1.5 text-[13px] transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                              "block min-w-0 wrap-break-word rounded-lg px-3 py-1.5 text-[13px] transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                               isTransformTaskActive(domain.name, task.name)
                                 ? "bg-sidebar-accent/80 text-sidebar-accent-foreground font-bold shadow-sm"
                                 : "text-muted-foreground/80 hover:text-foreground"

@@ -1,24 +1,22 @@
 "use client";
 
-import * as React from "react";
-import { useRouter } from "next/navigation";
-import { Search as SearchIcon, FileText, Database, Workflow, Command as IconCommand } from "lucide-react";
 import {
   Command,
-  CommandEmpty,
   CommandGroup,
-  CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
+  CommandSeparator
 } from "@/components/ui/command";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 import { SearchResult } from "@/lib/search";
+import { cn } from "@/lib/utils";
+import { Database, FileText, Command as IconCommand, Search as SearchIcon, Workflow } from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
 
 export function GlobalSearch() {
   const router = useRouter();
@@ -114,7 +112,7 @@ export function GlobalSearch() {
           </div>
         </PopoverTrigger>
         <PopoverContent 
-          className="p-0 w-[var(--radix-popover-trigger-width)] overflow-hidden rounded-xl border-border/50 bg-background/95 backdrop-blur-xl shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+          className="p-0 w-(--radix-popover-trigger-width) overflow-hidden rounded-xl border-border/50 bg-background/95 backdrop-blur-xl shadow-2xl animate-in fade-in zoom-in-95 duration-200"
           align="start"
           sideOffset={8}
           onOpenAutoFocus={(e) => e.preventDefault()}
@@ -175,7 +173,7 @@ export function GlobalSearch() {
                       className="group flex flex-col items-start gap-1 p-3 rounded-lg cursor-pointer data-[selected=true]:bg-primary data-[selected=true]:text-primary-foreground transition-colors"
                     >
                       <div className="flex items-center gap-2 w-full">
-                        <div className="p-1 rounded-md bg-primary/10 text-primary group-data-[selected=true]:bg-primary-foreground/20 group-data-[selected=true]:text-primary-foreground transition-colors text-inherit">
+                        <div className="p-1 rounded-md bg-primary/10 text-primary group-data-[selected=true]:bg-primary-foreground/20 group-data-[selected=true]:text-primary-foreground transition-colors">
                           {result.type === 'domain' ? <Database className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
                         </div>
                         <span className="font-medium text-foreground group-data-[selected=true]:text-primary-foreground">{result.title}</span>
@@ -202,7 +200,7 @@ export function GlobalSearch() {
                         className="group flex flex-col items-start gap-1 p-3 rounded-lg cursor-pointer data-[selected=true]:bg-primary data-[selected=true]:text-primary-foreground transition-colors"
                       >
                         <div className="flex items-center gap-2 w-full">
-                          <div className="p-1 rounded-md bg-primary/10 text-primary group-data-[selected=true]:bg-primary-foreground/20 group-data-[selected=true]:text-primary-foreground transition-colors text-inherit">
+                          <div className="p-1 rounded-md bg-primary/10 text-primary group-data-[selected=true]:bg-primary-foreground/20 group-data-[selected=true]:text-primary-foreground transition-colors">
                             {result.type === 'transform-domain' ? <Workflow className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
                           </div>
                           <span className="font-medium text-foreground group-data-[selected=true]:text-primary-foreground">{result.title}</span>
@@ -223,7 +221,7 @@ export function GlobalSearch() {
             <div className="border-t border-border/30 p-2.5 flex items-center justify-between text-[10px] text-muted-foreground/60 bg-muted/20">
               <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1">
-                  <kbd className="rounded border border-border/50 bg-background px-1 px-1.5 py-0.5 font-mono text-[9px]">↑↓</kbd>
+                  <kbd className="rounded border border-border/50 bg-background px-1.5 py-0.5 font-mono text-[9px]">↑↓</kbd>
                   Navigate
                 </span>
                 <span className="flex items-center gap-1">

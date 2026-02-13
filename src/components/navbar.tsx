@@ -1,12 +1,11 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { Menu, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { ModeToggle } from "@/components/mode-toggle";
-import { cn } from "@/lib/utils";
 import { GlobalSearch } from "@/components/global-search";
+import { ModeToggle } from "@/components/mode-toggle";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { Menu } from "lucide-react";
+import Link from "next/link";
 
 interface NavbarProps {
   onMenuClick?: () => void;

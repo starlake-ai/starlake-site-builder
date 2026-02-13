@@ -1,13 +1,13 @@
-import { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { Breadcrumbs, PrevNextNav } from "@/components/breadcrumbs";
+import { TableDetails } from "@/components/load-table-details";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   getDomain,
   getTableJson,
   getTableRelationsJson,
-} from "@/lib/tpch/load-metadata";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Breadcrumbs, PrevNextNav } from "@/components/breadcrumbs";
-import { TableDetails } from "@/components/load-table-details";
+} from "@/lib/metadata/load-metadata";
+import { Metadata } from "next";
+import { notFound } from "next/navigation";
 
 import { constructMetadata } from "@/lib/seo-config";
 

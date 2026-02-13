@@ -1,5 +1,5 @@
-import { getDomains } from "./tpch/load-metadata";
-import { getTransformDomains } from "./tpch/transform-metadata";
+import { getDomains } from "./metadata/load-metadata";
+import { getTransformDomains } from "./metadata/transform-metadata";
 
 export interface SearchResult {
   id: string;

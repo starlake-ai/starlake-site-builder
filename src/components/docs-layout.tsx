@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Navbar } from "@/components/navbar";
 import {
   Sidebar,
@@ -8,6 +7,7 @@ import {
   type LoadDomain,
   type TransformDomain,
 } from "@/components/sidebar";
+import { useState } from "react";
 
 interface DocsLayoutProps {
   loadDomains: LoadDomain[];
