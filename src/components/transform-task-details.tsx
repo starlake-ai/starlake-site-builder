@@ -148,6 +148,33 @@ export function TransformTaskDetails({
 
   const hasLineageData = lineageTables.length > 0;
 
+  const columnExpressionsByNodeId = useMemo(() => {
+    const map = new Map<string, Map<string, string[]>>();
+    const add = (nodeId: string, column: string | undefined, expression: string | undefined) => {
+      if (!nodeId || column == null || expression == null || expression === "") return;
+      const colKey = normalizeHandleId(column);
+      if (!colKey) return;
+      let colMap = map.get(nodeId);
+      if (!colMap) {
+        colMap = new Map<string, string[]>();
+        map.set(nodeId, colMap);
+      }
+      const list = colMap.get(colKey) ?? [];
+      if (!list.includes(expression)) list.push(expression);
+      colMap.set(colKey, list);
+    };
+    lineageRelations.forEach((rel) => {
+      if (typeof rel?.from?.domain !== "string" || typeof rel?.from?.table !== "string") return;
+      if (typeof rel?.to?.domain !== "string" || typeof rel?.to?.table !== "string") return;
+      const fromId = `${rel.from.domain}.${rel.from.table}`;
+      const toId = `${rel.to.domain}.${rel.to.table}`;
+      const expr = typeof rel.expression === "string" ? rel.expression : undefined;
+      add(fromId, rel.from.column, expr);
+      add(toId, rel.to.column, expr);
+    });
+    return map;
+  }, [lineageRelations]);
+
   const attrByName = useMemo(() => {
     const m = new Map<string, { primaryKey?: boolean; foreignKey?: boolean }>();
     (attributes as JsonRecord[]).forEach((a) => {
@@ -193,6 +220,13 @@ export function TransformTaskDetails({
             }
             return col;
           });
+          const columnExpressions: Record<string, string[]> = {};
+          const colMap = columnExpressionsByNodeId.get(nodeId);
+          if (colMap) {
+            colMap.forEach((exprs, colKey) => {
+              columnExpressions[colKey] = exprs;
+            });
+          }
           return {
             id: nodeId,
             type: "lineageNode",
@@ -204,13 +238,14 @@ export function TransformTaskDetails({
               domain: item.domain,
               table: item.table,
               columns: enrichedColumns,
+              columnExpressions: Object.keys(columnExpressions).length > 0 ? columnExpressions : undefined,
             },
             sourcePosition: Position.Right,
             targetPosition: Position.Left,
             draggable: true,
           };
         }),
-    [lineageTables, attrByName]
+    [lineageTables, attrByName, columnExpressionsByNodeId]
   );
 
   const initialEdges: Edge[] = useMemo(() => {

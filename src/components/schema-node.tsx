@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Handle, Position } from "reactflow";
 import type { NodeProps } from "reactflow";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ export interface SchemaNodeData {
   domain: string;
   table: string;
   columns: SchemaColumnInfo[];
+  columnExpressions?: Record<string, string[]>;
 }
 
 export function normalizeHandleId(value?: string): string {
@@ -23,6 +25,16 @@ export function normalizeHandleId(value?: string): string {
 
 export function SchemaNode({ data }: NodeProps<SchemaNodeData>) {
   const [hoveredCol, setHoveredCol] = useState<string | null>(null);
+  const [tooltipRect, setTooltipRect] = useState<DOMRect | null>(null);
+
+  const handleColMouseEnter = (column: string, el: HTMLDivElement) => {
+    setHoveredCol(column);
+    setTooltipRect(el.getBoundingClientRect());
+  };
+  const handleColMouseLeave = () => {
+    setHoveredCol(null);
+    setTooltipRect(null);
+  };
 
   return (
     <div className="min-w-64 overflow-hidden rounded-lg shadow-lg border-0 bg-[#f5f5f5] dark:bg-card">
@@ -39,11 +51,13 @@ export function SchemaNode({ data }: NodeProps<SchemaNodeData>) {
           const column = col.name;
           const isHovered = hoveredCol === column;
           const handleId = normalizeHandleId(column);
+          const expressions = data.columnExpressions?.[handleId];
+          const hasTooltip = Boolean(expressions?.length);
           return (
             <div
               key={`${data.domain}.${data.table}.${column}`}
-              onMouseEnter={() => setHoveredCol(column)}
-              onMouseLeave={() => setHoveredCol(null)}
+              onMouseEnter={(e) => handleColMouseEnter(column, e.currentTarget)}
+              onMouseLeave={handleColMouseLeave}
               className={cn(
                 "relative px-4 py-2 text-left text-[13px] font-medium transition-colors",
                 isHovered && "bg-primary/10 dark:bg-primary/20",
@@ -121,6 +135,21 @@ export function SchemaNode({ data }: NodeProps<SchemaNodeData>) {
                   FK
                 </span>
               )}
+              {hasTooltip && isHovered && expressions && tooltipRect && typeof document !== "undefined" &&
+                createPortal(
+                  <div
+                    className="fixed z-1000 max-w-[320px] rounded-md border border-border bg-popover px-3 py-2 text-xs font-mono text-popover-foreground shadow-md"
+                    role="tooltip"
+                    style={{
+                      left: tooltipRect.right + 8,
+                      top: tooltipRect.top + tooltipRect.height / 2 - 12,
+                      transform: "translateY(-50%)",
+                    }}
+                  >
+                    {expressions.join(" ")}
+                  </div>,
+                  document.body
+                )}
             </div>
           );
         })}
