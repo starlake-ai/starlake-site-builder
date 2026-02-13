@@ -83,7 +83,7 @@ npm install
 starlake site --format json --outputDir /path/to/json-site-map/
 ```
 
-3. Configure the path to your Starlake Site folder above in `.env.local`:
+4. Configure the path to your Starlake Site folder above in `.env.local`:
 
 ```env
 SITE_BASE_PATH=/path/to/json-site-map/
@@ -94,7 +94,7 @@ The app reads from `SITE_BASE_PATH` and expects:
 - `tables/` — `domains.json` and `{domain}.{table}.json`
 - `tasks/` — `tasks.json` and `{domain}.{task}.json`
 
-4. Run the development server:
+5. Run the development server:
 
 ```bash
 npm run dev
