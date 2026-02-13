@@ -77,10 +77,16 @@ cd starlake-site-builder
 npm install
 ```
 
-3. Configure the path to your Starlake project in `.env.local`:
+3. Build the JSON Site Map using Starlake
+
+```bash
+starlake site --format json --outputDir /path/to/json-site-map/
+```
+
+3. Configure the path to your Starlake Site folder above in `.env.local`:
 
 ```env
-SITE_BASE_PATH=/path/to/your/starlake-project
+SITE_BASE_PATH=/path/to/json-site-map/
 ```
 
 The app reads from `SITE_BASE_PATH` and expects:
