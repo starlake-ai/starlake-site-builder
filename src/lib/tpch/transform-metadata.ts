@@ -2,13 +2,13 @@ import { readFileSync, readdirSync, existsSync } from "fs";
 import path from "path";
 
 function getTasksDir(): string | null {
-  const base = process.env.TPCH_BASE_PATH;
+  const base = process.env.SITE_BASE_PATH;
   if (!base) return null;
   return path.join(base, "tasks");
 }
 
 function getTasksLineageDir(): string | null {
-  const base = process.env.TPCH_BASE_PATH;
+  const base = process.env.SITE_BASE_PATH;
   if (!base) return null;
   return path.join(base, "tasks-lineage");
 }
@@ -32,8 +32,8 @@ interface TasksJsonItem {
 export function getTransformDomains(): TransformDomainInfo[] {
   const tasksDir = getTasksDir();
   if (!tasksDir || !existsSync(tasksDir)) {
-    if (!process.env.TPCH_BASE_PATH) {
-      console.warn("TPCH_BASE_PATH environment variable is not set");
+    if (!process.env.SITE_BASE_PATH) {
+      console.warn("SITE_BASE_PATH environment variable is not set");
     } else {
       console.warn(`TPCH tasks directory not found: ${tasksDir}`);
     }
@@ -60,26 +60,30 @@ export function getTransformDomains(): TransformDomainInfo[] {
   }
 
   const files = readdirSync(tasksDir);
-  const result: TransformDomainInfo[] = domainNames.map((domainName) => {
-    const prefix = `${domainName}.`;
-    const suffix = ".json";
-    const taskFiles = files.filter(
-      (f) =>
-        f !== "tasks.json" &&
-        f.startsWith(prefix) &&
-        f.endsWith(suffix) &&
-        f.length > prefix.length + suffix.length
-    );
-    const tasks: TaskInfo[] = taskFiles.map((f) => {
-      const base = f.slice(0, -suffix.length);
-      const taskName = base.slice(prefix.length);
-      return {
-        name: taskName,
-        filePath: path.join(tasksDir, f),
-      };
+  const result: TransformDomainInfo[] = domainNames
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
+    .map((domainName) => {
+      const prefix = `${domainName}.`;
+      const suffix = ".json";
+      const taskFiles = files.filter(
+        (f) =>
+          f !== "tasks.json" &&
+          f.startsWith(prefix) &&
+          f.endsWith(suffix) &&
+          f.length > prefix.length + suffix.length
+      );
+      const tasks: TaskInfo[] = taskFiles
+        .map((f) => {
+          const base = f.slice(0, -suffix.length);
+          const taskName = base.slice(prefix.length);
+          return {
+            name: taskName,
+            filePath: path.join(tasksDir, f),
+          };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+      return { name: domainName, tasks };
     });
-    return { name: domainName, tasks };
-  });
 
   return result;
 }

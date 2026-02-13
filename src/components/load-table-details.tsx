@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
-import { Table as TableIcon } from "lucide-react";
 import ReactFlow, {
   Background,
   Controls,
@@ -51,13 +50,20 @@ interface RelationLink {
   relationType?: string;
 }
 
+interface RelationColumnInfo {
+  name: string;
+  primaryKey?: boolean;
+  foreignKey?: boolean;
+}
+
 interface RelationNodeData {
   domain: string;
   table: string;
-  columns: string[];
+  columns: RelationColumnInfo[];
 }
 
 function RelationNode({ data }: NodeProps<RelationNodeData>) {
+  const [hoveredCol, setHoveredCol] = useState<string | null>(null);
   return (
     <div className="min-w-64 overflow-hidden rounded-lg shadow-lg border-0 bg-[#f5f5f5] dark:bg-card">
       <div className="relative border-b-2 border-primary bg-primary px-4 py-3 dark:border-muted dark:bg-muted">
@@ -67,17 +73,22 @@ function RelationNode({ data }: NodeProps<RelationNodeData>) {
         <div className="text-center text-[15px] font-extrabold text-primary-foreground dark:text-foreground mt-0.5">
           {data.table}
         </div>
-        <TableIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-foreground/90 dark:text-muted-foreground" />
       </div>
       <div className="bg-[#f5f5f5] dark:bg-card">
-        {data.columns.map((column, rowIndex) => (
+        {data.columns.map((col, rowIndex) => {
+          const column = col.name;
+          const isHovered = hoveredCol === column;
+          return (
           <div
             key={`${data.domain}.${data.table}.${column}`}
+            onMouseEnter={() => setHoveredCol(column)}
+            onMouseLeave={() => setHoveredCol(null)}
             className={cn(
-              "relative px-4 py-2 text-left text-[13px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5",
-              rowIndex % 2 === 0 
-                ? "bg-[#eee] dark:bg-card" 
-                : "bg-[#dfdcdc] dark:bg-muted/30"
+              "relative px-4 py-2 text-left text-[13px] font-medium transition-colors",
+              isHovered && "bg-primary/10 dark:bg-primary/20",
+              !isHovered && (rowIndex % 2 === 0 
+                ? "bg-[#eee] dark:bg-card hover:bg-black/5 dark:hover:bg-white/5" 
+                : "bg-[#dfdcdc] dark:bg-muted/30 hover:bg-black/5 dark:hover:bg-white/5")
             )}
             style={{ color: "var(--node-text-color)" }}
           >
@@ -139,8 +150,15 @@ function RelationNode({ data }: NodeProps<RelationNodeData>) {
               );
             })()}
             <span className="text-[#444] dark:text-foreground">{column}</span>
+            {col.primaryKey && (
+              <span className="ml-2 text-[10px] font-bold text-muted-foreground" title="Primary Key">PK</span>
+            )}
+            {col.foreignKey && (
+              <span className="ml-1 text-[10px] font-bold text-muted-foreground" title="Foreign Key">FK</span>
+            )}
           </div>
-        ))}
+        );
+        })}
       </div>
       <style jsx>{`
         div {
@@ -167,7 +185,24 @@ export function TableDetails({
   tableJson,
   relationsJson,
 }: TableDetailsProps) {
+  const TAB_STORAGE_KEY = "load-details-tab";
   const [activeTab, setActiveTab] = useState<TabId>("general");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(TAB_STORAGE_KEY) as TabId | null;
+      if (saved && ["general", "attributes", "relations"].includes(saved)) {
+        setActiveTab(saved);
+      }
+    }
+  }, []);
+
+  const handleTabChange = (tab: TabId) => {
+    setActiveTab(tab);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(TAB_STORAGE_KEY, tab);
+    }
+  };
 
   const pattern =
     (tableJson.pattern as string | undefined) ??
@@ -197,7 +232,33 @@ export function TableDetails({
     : [];
 
   const attributeKeys =
-    attributes.length > 0 ? Object.keys(attributes[0] ?? {}) : [];
+    attributes.length > 0
+      ? (() => {
+          const allKeys = new Set<string>();
+          attributes.forEach((attr) => Object.keys(attr ?? {}).forEach((k) => allKeys.add(k)));
+          const raw = Array.from(allKeys);
+          const excludeLower = ["foreignkey", "foreign_key", "description"];
+          const toLower = (s: string) => s.toLowerCase();
+          let rest = raw.filter((k) => !excludeLower.includes(toLower(k)));
+          const typeKey = rest.find((k) => toLower(k) === "type" || toLower(k) === "columntype");
+          const arrayKey = rest.find((k) => toLower(k) === "array");
+          const commentKey = rest.find((k) => toLower(k) === "comment");
+          const hasArray = arrayKey != null;
+          const hasComment = commentKey != null;
+          rest = rest.filter((k) => k !== arrayKey && k !== commentKey);
+          if (typeKey) {
+            const idx = rest.indexOf(typeKey);
+            if (idx !== -1) {
+              rest = [...rest.slice(0, idx + 1), ...(hasArray ? [arrayKey!] : []), ...rest.slice(idx + 1)];
+            } else if (hasArray) {
+              rest = [arrayKey!, ...rest];
+            }
+          } else if (hasArray) {
+            rest = [arrayKey!, ...rest];
+          }
+          return [...rest, ...(hasComment ? [commentKey!] : [])];
+        })()
+      : [];
 
   const relationItems = useMemo(
     () =>
@@ -235,7 +296,11 @@ export function TableDetails({
               table: table || item.label,
               columns: (item.columns ?? [])
                 .filter((c): c is RelationColumn & { name: string } => typeof c?.name === "string")
-                .map((c) => c.name),
+                .map((c) => ({
+                  name: c.name,
+                  primaryKey: c.primaryKey === true,
+                  foreignKey: c.foreignKey === true,
+                })),
             },
             sourcePosition: Position.Right,
             targetPosition: Position.Left,
@@ -255,7 +320,7 @@ export function TableDetails({
       const columns = Array.isArray(item.columns) ? item.columns : [];
       nodeColumnsById.set(
         item.id,
-        new Set(columns.filter(c => typeof c.name === "string").map((c) => normalizeHandleId(c.name)))
+        new Set(columns.filter((c): c is RelationColumn & { name: string } => typeof c?.name === "string").map((c) => normalizeHandleId(c.name)))
       );
     });
 
@@ -290,10 +355,11 @@ export function TableDetails({
           source: sourceNodeId,
           target: targetNodeId,
           label: relation.relationType,
-          type: "smoothstep",
+          type: "default",
           style: {
             stroke: "#777",
             strokeWidth: 2,
+            strokeDasharray: "5,5",
           },
           labelStyle: {
             fill: "rgb(var(--foreground))",
@@ -308,7 +374,6 @@ export function TableDetails({
             type: MarkerType.ArrowClosed,
             color: "#777",
           },
-          animated: true,
         };
 
         if (sourceHasHandle) {
@@ -340,7 +405,7 @@ export function TableDetails({
           <button
             key={tab}
             type="button"
-            onClick={() => setActiveTab(tab)}
+            onClick={() => handleTabChange(tab)}
             className={cn(
               "relative rounded-lg px-4 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-bold transition-all duration-300 cursor-pointer whitespace-nowrap",
               activeTab === tab
@@ -436,7 +501,7 @@ export function TableDetails({
                           key={key}
                           className="px-6 py-4 align-top text-[13px] text-muted-foreground/90"
                         >
-                          {formatCellValue(attr[key])}
+                          {formatAttributeValue(key, attr)}
                         </td>
                       ))}
                     </tr>
@@ -472,7 +537,7 @@ export function TableDetails({
                 }}
               >
                 <Background />
-                <Controls className="!bg-background !border-border/50 !shadow-xl rounded-lg overflow-hidden" />
+                <Controls showInteractive={false} className="!bg-background !border-border/50 !shadow-xl rounded-lg overflow-hidden" />
               </ReactFlow>
             </div>
           )}
@@ -505,6 +570,16 @@ function formatCellValue(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+function formatAttributeValue(key: string, attr: JsonRecord): string {
+  const value = attr[key];
+  if (key === "type" || key === "columnType") {
+    const baseType = formatCellValue(value);
+    const isArray = attr.array === true || attr.Array === true;
+    return isArray ? `${baseType} [ ]` : baseType;
+  }
+  return formatCellValue(value);
 }
 
 function getDomainAndTable(itemId?: string): { domain: string; table: string } {

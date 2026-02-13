@@ -2,13 +2,13 @@ import { readFileSync, readdirSync, existsSync } from "fs";
 import path from "path";
 
 function getTablesDir(): string | null {
-  const base = process.env.TPCH_BASE_PATH;
+  const base = process.env.SITE_BASE_PATH;
   if (!base) return null;
   return path.join(base, "tables");
 }
 
 function getTableRelationsDir(): string | null {
-  const base = process.env.TPCH_BASE_PATH;
+  const base = process.env.SITE_BASE_PATH;
   if (!base) return null;
   return path.join(base, "table-relations");
 }
@@ -32,8 +32,8 @@ interface DomainsJsonItem {
 export function getDomains(): DomainInfo[] {
   const tablesDir = getTablesDir();
   if (!tablesDir || !existsSync(tablesDir)) {
-    if (!process.env.TPCH_BASE_PATH) {
-      console.warn("TPCH_BASE_PATH environment variable is not set");
+    if (!process.env.SITE_BASE_PATH) {
+      console.warn("SITE_BASE_PATH environment variable is not set");
     } else {
       console.warn(`TPCH tables directory not found: ${tablesDir}`);
     }
@@ -60,22 +60,26 @@ export function getDomains(): DomainInfo[] {
   }
 
   const files = readdirSync(tablesDir);
-  const result: DomainInfo[] = domainNames.map((domainName) => {
-    const prefix = `${domainName}.`;
-    const suffix = ".json";
-    const tableFiles = files.filter(
-      (f) => f.startsWith(prefix) && f.endsWith(suffix) && f.length > prefix.length + suffix.length
-    );
-    const tables: TableInfo[] = tableFiles.map((f) => {
-      const base = f.slice(0, -suffix.length);
-      const tableName = base.slice(prefix.length);
-      return {
-        name: tableName,
-        filePath: path.join(tablesDir, f),
-      };
+  const result: DomainInfo[] = domainNames
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
+    .map((domainName) => {
+      const prefix = `${domainName}.`;
+      const suffix = ".json";
+      const tableFiles = files.filter(
+        (f) => f.startsWith(prefix) && f.endsWith(suffix) && f.length > prefix.length + suffix.length
+      );
+      const tables: TableInfo[] = tableFiles
+        .map((f) => {
+          const base = f.slice(0, -suffix.length);
+          const tableName = base.slice(prefix.length);
+          return {
+            name: tableName,
+            filePath: path.join(tablesDir, f),
+          };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+      return { name: domainName, tables };
     });
-    return { name: domainName, tables };
-  });
 
   return result;
 }

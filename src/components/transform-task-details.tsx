@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Table as TableIcon } from "lucide-react";
+import { Copy, Check } from "lucide-react";
 import CodeMirror from "@uiw/react-codemirror";
 import { sql as sqlLang } from "@codemirror/lang-sql";
 import ReactFlow, {
@@ -36,10 +35,16 @@ const TAB_LABELS: Record<TabId, string> = {
   lineage: "Lineage",
 };
 
+interface LineageColumnInfo {
+  name: string;
+  primaryKey?: boolean;
+  foreignKey?: boolean;
+}
+
 interface LineageTable {
   domain?: string;
   table?: string;
-  columns?: string[];
+  columns?: (string | LineageColumnInfo)[];
   isTask?: boolean;
 }
 
@@ -59,10 +64,11 @@ interface LineageNodeData {
   domain: string;
   table: string;
   isTask: boolean;
-  columns: string[];
+  columns: LineageColumnInfo[];
 }
 
 function LineageNode({ data }: NodeProps<LineageNodeData>) {
+  const [hoveredCol, setHoveredCol] = useState<string | null>(null);
   return (
     <div className="min-w-64 overflow-hidden rounded-lg shadow-lg border-0 bg-[#f5f5f5] dark:bg-card">
       <div className="relative border-b-2 border-primary bg-primary px-4 py-3 dark:border-muted dark:bg-muted">
@@ -72,17 +78,22 @@ function LineageNode({ data }: NodeProps<LineageNodeData>) {
         <div className="text-center text-[15px] font-extrabold text-primary-foreground dark:text-foreground mt-0.5">
           {data.table}
         </div>
-        <TableIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-foreground/90 dark:text-muted-foreground" />
       </div>
       <div className="bg-[#f5f5f5] dark:bg-card">
-        {data.columns.map((column, rowIndex) => (
+        {data.columns.map((col, rowIndex) => {
+          const column = col.name;
+          const isHovered = hoveredCol === column;
+          return (
           <div
             key={`${data.domain}.${data.table}.${column}`}
+            onMouseEnter={() => setHoveredCol(column)}
+            onMouseLeave={() => setHoveredCol(null)}
             className={cn(
-              "relative px-4 py-2 text-left text-[13px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5",
-              rowIndex % 2 === 0 
-                ? "bg-[#eee] dark:bg-card" 
-                : "bg-[#dfdcdc] dark:bg-muted/30"
+              "relative px-4 py-2 text-left text-[13px] font-medium transition-colors",
+              isHovered && "bg-primary/10 dark:bg-primary/20",
+              !isHovered && (rowIndex % 2 === 0 
+                ? "bg-[#eee] dark:bg-card hover:bg-black/5 dark:hover:bg-white/5" 
+                : "bg-[#dfdcdc] dark:bg-muted/30 hover:bg-black/5 dark:hover:bg-white/5")
             )}
             style={{ color: "var(--node-text-color)" }}
           >
@@ -144,8 +155,15 @@ function LineageNode({ data }: NodeProps<LineageNodeData>) {
               );
             })()}
             <span className="text-[#444] dark:text-foreground">{column}</span>
+            {col.primaryKey && (
+              <span className="ml-2 text-[10px] font-bold text-muted-foreground" title="Primary Key">PK</span>
+            )}
+            {col.foreignKey && (
+              <span className="ml-1 text-[10px] font-bold text-muted-foreground" title="Foreign Key">FK</span>
+            )}
           </div>
-        ))}
+        );
+        })}
       </div>
       <style jsx>{`
         div {
@@ -172,7 +190,25 @@ export function TransformTaskDetails({
   taskJson,
   lineageJson,
 }: TransformTaskDetailsProps) {
+  const TAB_STORAGE_KEY = "transform-details-tab";
   const [activeTab, setActiveTab] = useState<TabId>("general");
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(TAB_STORAGE_KEY) as TabId | null;
+      if (saved && ["general", "attributes", "sql", "lineage"].includes(saved)) {
+        setActiveTab(saved);
+      }
+    }
+  }, []);
+
+  const handleTabChange = (tab: TabId) => {
+    setActiveTab(tab);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(TAB_STORAGE_KEY, tab);
+    }
+  };
   const { resolvedTheme } = useTheme();
 
   const rawWriteStrategy =
@@ -196,7 +232,33 @@ export function TransformTaskDetails({
     : [];
 
   const attributeKeys =
-    attributes.length > 0 ? Object.keys(attributes[0] ?? {}) : [];
+    attributes.length > 0
+      ? (() => {
+          const allKeys = new Set<string>();
+          attributes.forEach((attr) => Object.keys(attr ?? {}).forEach((k) => allKeys.add(k)));
+          const raw = Array.from(allKeys);
+          const excludeLower = ["foreignkey", "foreign_key", "description"];
+          const toLower = (s: string) => s.toLowerCase();
+          let rest = raw.filter((k) => !excludeLower.includes(toLower(k)));
+          const typeKey = rest.find((k) => toLower(k) === "type" || toLower(k) === "columntype");
+          const arrayKey = rest.find((k) => toLower(k) === "array");
+          const commentKey = rest.find((k) => toLower(k) === "comment");
+          const hasArray = arrayKey != null;
+          const hasComment = commentKey != null;
+          rest = rest.filter((k) => k !== arrayKey && k !== commentKey);
+          if (typeKey) {
+            const idx = rest.indexOf(typeKey);
+            if (idx !== -1) {
+              rest = [...rest.slice(0, idx + 1), ...(hasArray ? [arrayKey!] : []), ...rest.slice(idx + 1)];
+            } else if (hasArray) {
+              rest = [arrayKey!, ...rest];
+            }
+          } else if (hasArray) {
+            rest = [arrayKey!, ...rest];
+          }
+          return [...rest, ...(hasComment ? [commentKey!] : [])];
+        })()
+      : [];
 
   const sql =
     typeof taskJson.sql === "string"
@@ -227,6 +289,20 @@ export function TransformTaskDetails({
 
   const hasLineageData = lineageTables.length > 0;
 
+  const attrByName = useMemo(() => {
+    const m = new Map<string, { primaryKey?: boolean; foreignKey?: boolean }>();
+    (attributes as JsonRecord[]).forEach((a) => {
+      const name = (a.name ?? a.Name ?? a.column ?? a.column_name) as string | undefined;
+      if (typeof name === "string") {
+        m.set(name.trim().toLowerCase(), {
+          primaryKey: a.primaryKey === true || a.primary_key === true || a.pk === true,
+          foreignKey: a.foreignKey === true || a.foreign_key === true || a.fk === true,
+        });
+      }
+    });
+    return m;
+  }, [attributes]);
+
   const initialNodes: Node[] = useMemo(
     () =>
       lineageTables
@@ -236,6 +312,28 @@ export function TransformTaskDetails({
         )
         .map((item, index) => {
           const nodeId = `${item.domain}.${item.table}`;
+          const baseColumns: LineageColumnInfo[] = Array.isArray(item.columns)
+            ? item.columns.map((c): LineageColumnInfo => {
+                if (typeof c === "string") return { name: c.trim() };
+                const obj = c as LineageColumnInfo & { name?: string };
+                return {
+                  name: (obj.name ?? String(c)).trim(),
+                  primaryKey: obj.primaryKey === true,
+                  foreignKey: obj.foreignKey === true,
+                };
+              })
+            : [];
+          const enrichedColumns = baseColumns.map((col) => {
+            const fromAttr = attrByName.get(col.name.toLowerCase());
+            if (fromAttr && (!col.primaryKey && !col.foreignKey)) {
+              return {
+                ...col,
+                primaryKey: fromAttr.primaryKey ?? col.primaryKey,
+                foreignKey: fromAttr.foreignKey ?? col.foreignKey,
+              };
+            }
+            return col;
+          });
           return {
             id: nodeId,
             type: "lineageNode",
@@ -247,16 +345,14 @@ export function TransformTaskDetails({
               domain: item.domain,
               table: item.table,
               isTask: Boolean(item.isTask),
-              columns: Array.isArray(item.columns)
-                ? item.columns.map((c) => String(c).trim())
-                : [],
+              columns: enrichedColumns,
             },
             sourcePosition: Position.Right,
             targetPosition: Position.Left,
             draggable: true,
           };
         }),
-    [lineageTables]
+    [lineageTables, attrByName]
   );
 
   const initialEdges: Edge[] = useMemo(() => {
@@ -270,7 +366,7 @@ export function TransformTaskDetails({
       nodeOrderById.set(nodeId, nodeOrderById.size);
       nodeColumnsById.set(
         nodeId,
-        new Set(columns.map((column) => normalizeHandleId(String(column))))
+        new Set(columns.map((c) => normalizeHandleId(typeof c === "string" ? c : (c as LineageColumnInfo).name)))
       );
     });
 
@@ -303,16 +399,16 @@ export function TransformTaskDetails({
           id: `lineage-${index}`,
           source,
           target,
-          type: "smoothstep",
+          type: "default",
           style: {
             stroke: "#777",
             strokeWidth: 2,
+            strokeDasharray: "5,5",
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color: "#777",
           },
-          animated: true,
         };
 
         if (sourceHasHandle && sourceHandleCandidate) {
@@ -344,7 +440,7 @@ export function TransformTaskDetails({
           <button
             key={tab}
             type="button"
-            onClick={() => setActiveTab(tab)}
+            onClick={() => handleTabChange(tab)}
             className={cn(
               "relative rounded-lg px-4 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-bold transition-all duration-300 cursor-pointer whitespace-nowrap",
               activeTab === tab
@@ -432,7 +528,7 @@ export function TransformTaskDetails({
                           key={key}
                           className="px-6 py-4 align-top text-[13px] text-muted-foreground/90"
                         >
-                          {formatCellValue(attr[key])}
+                          {formatAttributeValue(key, attr)}
                         </td>
                       ))}
                     </tr>
@@ -448,7 +544,35 @@ export function TransformTaskDetails({
         <div className="space-y-4">
           {sql ? (
             <div className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-lg transition-all duration-300 hover:shadow-xl hover:border-border/80">
-              <ScrollArea className="max-h-[600px] w-full bg-card">
+              <div className="flex items-center justify-end gap-2 border-b border-border/60 bg-muted/30 px-4 py-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(sql);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    } catch {
+                      // fallback ignored
+                    }
+                  }}
+                  className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  aria-label="Copy SQL"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="size-4" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="size-4" />
+                      Copy
+                    </>
+                  )}
+                </button>
+              </div>
+              <div className="max-h-[420px] overflow-y-auto w-full bg-card">
                 <CodeMirror
                   value={sql}
                   extensions={[sqlLang()]}
@@ -458,10 +582,10 @@ export function TransformTaskDetails({
                   }}
                   theme={resolvedTheme === "dark" ? "dark" : "light"}
                   editable={false}
-                  height="100%"
-                  className="text-[13px]"
+                  height="400px"
+                  className="text-[13px] border-0"
                 />
-              </ScrollArea>
+              </div>
             </div>
           ) : (
             <p className="py-12 text-center text-sm text-muted-foreground bg-muted/20 rounded-2xl border-2 border-dashed border-border/40">
@@ -494,7 +618,7 @@ export function TransformTaskDetails({
                 }}
               >
                 <Background />
-                <Controls className="!bg-background !border-border/50 !shadow-xl rounded-lg overflow-hidden" />
+                <Controls showInteractive={false} className="!bg-background !border-border/50 !shadow-xl rounded-lg overflow-hidden" />
               </ReactFlow>
             </div>
           )}
@@ -538,6 +662,16 @@ function formatCellValue(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+function formatAttributeValue(key: string, attr: JsonRecord): string {
+  const value = attr[key];
+  if (key === "type" || key === "columnType") {
+    const baseType = formatCellValue(value);
+    const isArray = attr.array === true || attr.Array === true;
+    return isArray ? `${baseType} [ ]` : baseType;
+  }
+  return formatCellValue(value);
 }
 
 function formatWriteStrategy(value: unknown): string | undefined {
