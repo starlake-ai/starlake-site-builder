@@ -8,9 +8,7 @@
 
 ---
 
-## Screenshots
-
-### Homepage
+### Home page
 
 The main landing page gives you quick access to Load and Transform documentation.
 
@@ -63,11 +61,6 @@ View the full SQL definition for each task and explore upstream data dependencie
 ---
 
 ## Getting Started
-
-### Prerequisites
-
-- Node.js 18+
-- npm or pnpm
 
 ### Installation
 
