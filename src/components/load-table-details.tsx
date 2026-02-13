@@ -20,6 +20,12 @@ import ReactFlow, {
   useNodesState,
 } from "reactflow";
 import "reactflow/dist/style.css";
+import { Maximize2, Minimize2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -68,6 +74,7 @@ export function TableDetails({
 }: TableDetailsProps) {
   const TAB_STORAGE_KEY = "load-details-tab";
   const [activeTab, setActiveTab] = useState<TabId>("general");
+  const [relationsMaximized, setRelationsMaximized] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -224,6 +231,7 @@ export function TableDetails({
             fill: "rgb(var(--background))",
             fillOpacity: 0.8,
           },
+          markerStart: "url(#lineage-dot)",
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color: "#777",
@@ -374,26 +382,109 @@ export function TableDetails({
               No relations found for this table.
             </p>
           ) : (
-            <div className="h-[700px] w-full overflow-hidden rounded-3xl border border-border/60 bg-background/50 backdrop-blur-sm shadow-2xl transition-all duration-300 hover:border-border/80">
-              <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                nodeTypes={relationNodeTypes}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                fitView
-                minZoom={0.2}
-                maxZoom={1.5}
-                proOptions={{ hideAttribution: true }}
-                style={{
-                  background: "transparent",
-                  color: "rgb(var(--foreground))",
-                }}
-              >
-                <Background />
-                <Controls showInteractive={false} className="bg-background! border-border/50! shadow-xl! rounded-lg overflow-hidden" />
-              </ReactFlow>
-            </div>
+            <>
+              {/* Define custom markers for ReactFlow edges */}
+              <svg style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}>
+                <defs>
+                  <marker
+                    id="lineage-dot"
+                    viewBox="0 0 10 10"
+                    refX="5"
+                    refY="5"
+                    markerWidth="4"
+                    markerHeight="4"
+                    orient="auto-start-reverse"
+                  >
+                    <circle cx="5" cy="5" r="4" fill="#777" />
+                  </marker>
+                </defs>
+              </svg>
+
+              {!relationsMaximized && (
+                <div className="h-[700px] w-full overflow-hidden rounded-3xl border border-border/60 bg-background/50 backdrop-blur-sm shadow-2xl transition-all duration-300 hover:border-border/80 relative">
+                  <ReactFlow
+                    nodes={nodes}
+                    edges={edges}
+                    nodeTypes={relationNodeTypes}
+                    onNodesChange={onNodesChange}
+                    onEdgesChange={onEdgesChange}
+                    fitView
+                    minZoom={0.2}
+                    maxZoom={1.5}
+                    proOptions={{ hideAttribution: true }}
+                    style={{
+                      background: "transparent",
+                      color: "rgb(var(--foreground))",
+                    }}
+                  >
+                    <Background />
+                    <Controls showInteractive={false} className="bg-background! border-border/50! shadow-xl! rounded-lg overflow-hidden">
+                      {/* <button
+                        type="button"
+                        onClick={() => setRelationsMaximized(true)}
+                        className="react-flow__controls-button react-flow__controls-maximize"
+                        title="Maximize relations"
+                        aria-label="Maximize relations"
+                      >
+                        <Maximize2 className="size-4" />
+                      </button> */}
+                    </Controls>
+                  </ReactFlow>
+                </div>
+              )}
+              <Dialog open={relationsMaximized} onOpenChange={setRelationsMaximized}>
+                <DialogContent
+                  showCloseButton={false}
+                  className="fixed inset-0 top-0 left-0 right-0 bottom-0 translate-x-0 translate-y-0 w-screen min-w-full h-dvh max-w-none rounded-none border-0 p-0 gap-0 flex flex-col bg-background"
+                >
+                  <DialogTitle className="sr-only">
+                    Relations — full screen
+                  </DialogTitle>
+                  <div className="flex items-center justify-between shrink-0 px-4 py-2 border-b border-border/60 bg-muted/30">
+                    <span className="text-sm font-semibold">Relations — full screen</span>
+                    <button
+                      type="button"
+                      onClick={() => setRelationsMaximized(false)}
+                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                      aria-label="Exit full screen"
+                    >
+                      <Minimize2 className="size-4" />
+                      <span>Exit full screen</span>
+                    </button>
+                  </div>
+                  <div className="flex-1 min-h-0 w-full">
+                    <ReactFlow
+                      nodes={nodes}
+                      edges={edges}
+                      nodeTypes={relationNodeTypes}
+                      onNodesChange={onNodesChange}
+                      onEdgesChange={onEdgesChange}
+                      fitView
+                      minZoom={0.2}
+                      maxZoom={1.5}
+                      proOptions={{ hideAttribution: true }}
+                      style={{
+                        background: "transparent",
+                        color: "rgb(var(--foreground))",
+                      }}
+                    >
+                      <Background />
+                      <Controls showInteractive={false} className="bg-background! border-border/50! shadow-xl! rounded-lg overflow-hidden">
+                        {/* <button
+                          type="button"
+                          onClick={() => setRelationsMaximized(false)}
+                          className="react-flow__controls-button react-flow__controls-maximize"
+                          title="Exit full screen"
+                          aria-label="Exit full screen"
+                        >
+                          <Minimize2 className="size-4" />
+                        </button> */}
+                      </Controls>
+                    </ReactFlow>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </>
           )}
         </div>
       )}
@@ -405,6 +496,12 @@ export function TableDetails({
         .react-flow__node-default.selectable.selected {
           outline: none !important;
           box-shadow: none !important;
+        }
+        /* Maximize button icon: always black on white control panel */
+        .react-flow__controls-button.react-flow__controls-maximize svg {
+          color: #111 !important;
+          stroke: #111 !important;
+          fill: none !important;
         }
       `}</style>
     </div>

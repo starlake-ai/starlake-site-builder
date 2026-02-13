@@ -40,7 +40,7 @@ export function SchemaNode({ data }: NodeProps<SchemaNodeData>) {
     <div className="min-w-64 overflow-hidden rounded-lg shadow-lg border-0 bg-[#f5f5f5] dark:bg-card">
       <div className="relative border-b-2 border-primary bg-primary px-4 py-3 dark:border-muted dark:bg-muted">
         <div className="text-center text-[11px] font-bold uppercase tracking-wider text-primary-foreground/80 dark:text-muted-foreground">
-          {data.domain}
+          {data.domain || "—"}
         </div>
         <div className="text-center text-[15px] font-extrabold text-primary-foreground dark:text-foreground mt-0.5">
           {data.table}
@@ -76,7 +76,7 @@ export function SchemaNode({ data }: NodeProps<SchemaNodeData>) {
                   left: -5,
                   width: 6,
                   height: 6,
-                  borderRadius: 0,
+                  borderRadius: "50%",
                   background: "#444",
                   border: "none",
                 }}
@@ -89,7 +89,7 @@ export function SchemaNode({ data }: NodeProps<SchemaNodeData>) {
                   right: -5,
                   width: 6,
                   height: 6,
-                  borderRadius: 0,
+                  borderRadius: "50%",
                   background: "#444",
                   border: "none",
                 }}

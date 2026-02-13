@@ -11,7 +11,12 @@ import {
   SchemaNode,
   normalizeHandleId,
 } from "@/components/schema-node";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, Maximize2, Minimize2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import CodeMirror from "@uiw/react-codemirror";
 import { sql as sqlLang } from "@codemirror/lang-sql";
 import ReactFlow, {
@@ -67,6 +72,13 @@ interface LineageRelation {
   expression?: string;
 }
 
+/** Node id for lineage: "domain.table" when domain is set, else "table" (for intermediate/CTE tables). */
+function getLineageNodeId(domain: string | undefined, table: string | undefined): string {
+  if (typeof table !== "string") return "";
+  if (typeof domain === "string" && domain.trim() !== "") return `${domain}.${table}`;
+  return table;
+}
+
 const lineageNodeTypes = {
   lineageNode: SchemaNode,
 };
@@ -79,6 +91,7 @@ export function TransformTaskDetails({
   const TAB_STORAGE_KEY = "transform-details-tab";
   const [activeTab, setActiveTab] = useState<TabId>("general");
   const [copied, setCopied] = useState(false);
+  const [lineageMaximized, setLineageMaximized] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -164,13 +177,13 @@ export function TransformTaskDetails({
       colMap.set(colKey, list);
     };
     lineageRelations.forEach((rel) => {
-      if (typeof rel?.from?.domain !== "string" || typeof rel?.from?.table !== "string") return;
-      if (typeof rel?.to?.domain !== "string" || typeof rel?.to?.table !== "string") return;
-      const fromId = `${rel.from.domain}.${rel.from.table}`;
-      const toId = `${rel.to.domain}.${rel.to.table}`;
+      if (typeof rel?.from?.table !== "string" || typeof rel?.to?.table !== "string") return;
+      const fromId = getLineageNodeId(rel.from?.domain, rel.from?.table);
+      const toId = getLineageNodeId(rel.to?.domain, rel.to?.table);
+      if (!fromId || !toId) return;
       const expr = typeof rel.expression === "string" ? rel.expression : undefined;
-      add(fromId, rel.from.column, expr);
-      add(toId, rel.to.column, expr);
+      add(fromId, rel.from?.column, expr);
+      add(toId, rel.to?.column, expr);
     });
     return map;
   }, [lineageRelations]);
@@ -192,12 +205,9 @@ export function TransformTaskDetails({
   const initialNodes: Node[] = useMemo(
     () =>
       lineageTables
-        .filter(
-          (item): item is Required<Pick<LineageTable, "domain" | "table">> & LineageTable =>
-            typeof item?.domain === "string" && typeof item?.table === "string"
-        )
+        .filter((item): item is LineageTable & { table: string } => typeof item?.table === "string")
         .map((item, index) => {
-          const nodeId = `${item.domain}.${item.table}`;
+          const nodeId = getLineageNodeId(item.domain, item.table);
           const baseColumns: LineageColumnInfo[] = Array.isArray(item.columns)
             ? item.columns.map((c): LineageColumnInfo => {
                 if (typeof c === "string") return { name: c.trim() };
@@ -235,7 +245,7 @@ export function TransformTaskDetails({
               y: 40 + Math.floor(index / 3) * 240,
             },
             data: {
-              domain: item.domain,
+              domain: item.domain ?? "",
               table: item.table,
               columns: enrichedColumns,
               columnExpressions: Object.keys(columnExpressions).length > 0 ? columnExpressions : undefined,
@@ -253,8 +263,8 @@ export function TransformTaskDetails({
     const nodeOrderById = new Map<string, number>();
     
     lineageTables.forEach((table) => {
-      if (typeof table.domain !== "string" || typeof table.table !== "string") return;
-      const nodeId = `${table.domain}.${table.table}`;
+      if (typeof table.table !== "string") return;
+      const nodeId = getLineageNodeId(table.domain, table.table);
       const columns = Array.isArray(table.columns) ? table.columns : [];
       nodeOrderById.set(nodeId, nodeOrderById.size);
       nodeColumnsById.set(
@@ -266,14 +276,12 @@ export function TransformTaskDetails({
     return lineageRelations
       .filter(
         (relation) =>
-          typeof relation?.from?.domain === "string" &&
-          typeof relation?.from?.table === "string" &&
-          typeof relation?.to?.domain === "string" &&
-          typeof relation?.to?.table === "string"
+          typeof relation?.from?.table === "string" && typeof relation?.to?.table === "string"
       )
       .map((relation, index) => {
-        const source = `${relation.from!.domain}.${relation.from!.table}`;
-        const target = `${relation.to!.domain}.${relation.to!.table}`;
+        const source = getLineageNodeId(relation.from?.domain, relation.from?.table);
+        const target = getLineageNodeId(relation.to?.domain, relation.to?.table);
+        if (!source || !target) return null;
         const sourceHandleCandidate = normalizeHandleId(relation.from?.column);
         const targetHandleCandidate = normalizeHandleId(relation.to?.column);
         
@@ -298,6 +306,7 @@ export function TransformTaskDetails({
             strokeWidth: 2,
             strokeDasharray: "5,5",
           },
+          markerStart: "url(#lineage-dot)",
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color: "#777",
@@ -312,7 +321,8 @@ export function TransformTaskDetails({
         }
 
         return edge;
-      });
+      })
+      .filter((e): e is Edge => e != null);
   }, [lineageRelations, lineageTables]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -494,26 +504,109 @@ export function TransformTaskDetails({
               No lineage found for this task.
             </p>
           ) : (
-            <div className="h-[700px] w-full overflow-hidden rounded-3xl border border-border/60 bg-background/50 backdrop-blur-sm shadow-2xl transition-all duration-300 hover:border-border/80">
-              <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                nodeTypes={lineageNodeTypes}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                fitView
-                minZoom={0.2}
-                maxZoom={1.5}
-                proOptions={{ hideAttribution: true }}
-                style={{
-                  background: "transparent",
-                  color: "rgb(var(--foreground))",
-                }}
-              >
-                <Background />
-                <Controls showInteractive={false} className="bg-background! border-border/50! shadow-xl! rounded-lg overflow-hidden" />
-              </ReactFlow>
-            </div>
+            <>
+              {/* Define custom markers for ReactFlow edges */}
+              <svg style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}>
+                <defs>
+                  <marker
+                    id="lineage-dot"
+                    viewBox="0 0 10 10"
+                    refX="5"
+                    refY="5"
+                    markerWidth="4"
+                    markerHeight="4"
+                    orient="auto-start-reverse"
+                  >
+                    <circle cx="5" cy="5" r="4" fill="#777" />
+                  </marker>
+                </defs>
+              </svg>
+
+              {!lineageMaximized && (
+                <div className="h-[700px] w-full overflow-hidden rounded-3xl border border-border/60 bg-background/50 backdrop-blur-sm shadow-2xl transition-all duration-300 hover:border-border/80 relative">
+                  <ReactFlow
+                    nodes={nodes}
+                    edges={edges}
+                    nodeTypes={lineageNodeTypes}
+                    onNodesChange={onNodesChange}
+                    onEdgesChange={onEdgesChange}
+                    fitView
+                    minZoom={0.2}
+                    maxZoom={1.5}
+                    proOptions={{ hideAttribution: true }}
+                    style={{
+                      background: "transparent",
+                      color: "rgb(var(--foreground))",
+                    }}
+                  >
+                    <Background />
+                    <Controls showInteractive={false} className="bg-background! border-border/50! shadow-xl! rounded-lg overflow-hidden">
+                      {/* <button
+                        type="button"
+                        onClick={() => setLineageMaximized(true)}
+                        className="react-flow__controls-button react-flow__controls-maximize"
+                        title="Maximize lineage"
+                        aria-label="Maximize lineage"
+                      >
+                        <Maximize2 className="size-4" />
+                      </button> */}
+                    </Controls>
+                  </ReactFlow>
+                </div>
+              )}
+              <Dialog open={lineageMaximized} onOpenChange={setLineageMaximized}>
+                <DialogContent
+                  showCloseButton={false}
+                  className="fixed inset-0 top-0 left-0 right-0 bottom-0 translate-x-0 translate-y-0 w-screen min-w-full h-dvh max-w-none rounded-none border-0 p-0 gap-0 flex flex-col bg-background"
+                >
+                  <DialogTitle className="sr-only">
+                    Lineage — full screen
+                  </DialogTitle>
+                  <div className="flex items-center justify-between shrink-0 px-4 py-2 border-b border-border/60 bg-muted/30">
+                    <span className="text-sm font-semibold">Lineage — full screen</span>
+                    <button
+                      type="button"
+                      onClick={() => setLineageMaximized(false)}
+                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                      aria-label="Exit full screen"
+                    >
+                      <Minimize2 className="size-4" />
+                      <span>Exit full screen</span>
+                    </button>
+                  </div>
+                  <div className="flex-1 min-h-0 w-full">
+                    <ReactFlow
+                      nodes={nodes}
+                      edges={edges}
+                      nodeTypes={lineageNodeTypes}
+                      onNodesChange={onNodesChange}
+                      onEdgesChange={onEdgesChange}
+                      fitView
+                      minZoom={0.2}
+                      maxZoom={1.5}
+                      proOptions={{ hideAttribution: true }}
+                      style={{
+                        background: "transparent",
+                        color: "rgb(var(--foreground))",
+                      }}
+                    >
+                      <Background />
+                      <Controls showInteractive={false} className="bg-background! border-border/50! shadow-xl! rounded-lg overflow-hidden">
+                        {/* <button
+                          type="button"
+                          onClick={() => setLineageMaximized(false)}
+                          className="react-flow__controls-button react-flow__controls-maximize"
+                          title="Exit full screen"
+                          aria-label="Exit full screen"
+                        >
+                          <Minimize2 className="size-4" />
+                        </button> */}
+                      </Controls>
+                    </ReactFlow>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </>
           )}
         </div>
       )}
@@ -525,6 +618,12 @@ export function TransformTaskDetails({
         .react-flow__node-default.selectable.selected {
           outline: none !important;
           box-shadow: none !important;
+        }
+        /* Maximize button icon: always black on white control panel */
+        .react-flow__controls-button.react-flow__controls-maximize svg {
+          color: #111 !important;
+          stroke: #111 !important;
+          fill: none !important;
         }
         .cm-editor, .cm-scroller {
           background-color: transparent !important;
