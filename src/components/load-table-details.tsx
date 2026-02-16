@@ -137,20 +137,49 @@ export function TableDetails({
   );
   const hasRelationsData = relationItems.length > 0;
 
+  const nodeDepthMap = useMemo(() => {
+    const depth = new Map<string, number>();
+    relationItems.forEach((item) => {
+      if (typeof item.id !== "string") return;
+      depth.set(item.id, 0);
+    });
+    let changed = true;
+    while (changed) {
+      changed = false;
+      relationLinks.forEach((rel) => {
+        if (typeof rel?.source !== "string" || typeof rel?.target !== "string") return;
+        const sourceNodeId = rel.source.split(".").slice(0, 2).join(".");
+        const targetNodeId = rel.target.split(".").slice(0, 2).join(".");
+        if (!sourceNodeId || !targetNodeId || sourceNodeId === targetNodeId) return;
+        const fromD = depth.get(sourceNodeId) ?? 0;
+        const toD = depth.get(targetNodeId) ?? 0;
+        if (toD <= fromD) {
+          depth.set(targetNodeId, fromD + 1);
+          changed = true;
+        }
+      });
+    }
+    return depth;
+  }, [relationItems, relationLinks]);
+
   const initialNodes: Node[] = useMemo(
-    () =>
-      relationItems
+    () => {
+      const depthSlots = new Map<number, number>();
+      return relationItems
         .filter((item): item is Required<Pick<RelationItem, "id" | "label">> & RelationItem =>
           typeof item?.id === "string" && typeof item?.label === "string"
         )
-        .map((item, index) => {
+        .map((item) => {
           const { domain, table } = getDomainAndTable(item.id);
+          const depth = nodeDepthMap.get(item.id) ?? 0;
+          const slotIndex = depthSlots.get(depth) ?? 0;
+          depthSlots.set(depth, slotIndex + 1);
           return {
             id: item.id,
             type: "relationNode",
             position: {
-              x: 80 + (index % 3) * 340,
-              y: 40 + Math.floor(index / 3) * 240,
+              x: 80 + depth * 400,
+              y: 40 + slotIndex * 240,
             },
             data: {
               domain,
@@ -167,17 +196,16 @@ export function TableDetails({
             targetPosition: Position.Left,
             draggable: true,
           };
-        }),
-    [relationItems]
+        });
+    },
+    [relationItems, nodeDepthMap]
   );
 
   const initialEdges: Edge[] = useMemo(() => {
     const nodeColumnsById = new Map<string, Set<string>>();
-    const nodeOrderById = new Map<string, number>();
 
     relationItems.forEach((item) => {
       if (typeof item.id !== "string") return;
-      nodeOrderById.set(item.id, nodeOrderById.size);
       const columns = Array.isArray(item.columns) ? item.columns : [];
       nodeColumnsById.set(
         item.id,
@@ -207,9 +235,9 @@ export function TableDetails({
           targetHandleCandidate && nodeColumnsById.get(targetNodeId)?.has(targetHandleCandidate)
         );
 
-        const sourceOrder = nodeOrderById.get(sourceNodeId) ?? 0;
-        const targetOrder = nodeOrderById.get(targetNodeId) ?? 0;
-        const isLeftToRight = sourceOrder <= targetOrder;
+        const sourceDepth = nodeDepthMap.get(sourceNodeId) ?? 0;
+        const targetDepth = nodeDepthMap.get(targetNodeId) ?? 0;
+        const isLeftToRight = sourceDepth <= targetDepth;
 
         const edge: Edge = {
           id: `relation-${index}`,
@@ -247,7 +275,7 @@ export function TableDetails({
 
         return edge;
       });
-  }, [relationLinks, relationItems]);
+  }, [relationLinks, relationItems, nodeDepthMap]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);

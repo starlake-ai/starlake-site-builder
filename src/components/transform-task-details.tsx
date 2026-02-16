@@ -202,12 +202,42 @@ export function TransformTaskDetails({
     return m;
   }, [attributes]);
 
+  const nodeDepthMap = useMemo(() => {
+    const depth = new Map<string, number>();
+    lineageTables.forEach((table) => {
+      if (typeof table.table !== "string") return;
+      const nodeId = getLineageNodeId(table.domain, table.table);
+      depth.set(nodeId, 0);
+    });
+    let changed = true;
+    while (changed) {
+      changed = false;
+      lineageRelations.forEach((rel) => {
+        if (!rel?.from?.table || !rel?.to?.table) return;
+        const fromId = getLineageNodeId(rel.from?.domain, rel.from?.table);
+        const toId = getLineageNodeId(rel.to?.domain, rel.to?.table);
+        if (!fromId || !toId || fromId === toId) return;
+        const fromD = depth.get(fromId) ?? 0;
+        const toD = depth.get(toId) ?? 0;
+        if (toD <= fromD) {
+          depth.set(toId, fromD + 1);
+          changed = true;
+        }
+      });
+    }
+    return depth;
+  }, [lineageTables, lineageRelations]);
+
   const initialNodes: Node[] = useMemo(
-    () =>
-      lineageTables
+    () => {
+      const depthSlots = new Map<number, number>();
+      return lineageTables
         .filter((item): item is LineageTable & { table: string } => typeof item?.table === "string")
-        .map((item, index) => {
+        .map((item) => {
           const nodeId = getLineageNodeId(item.domain, item.table);
+          const depth = nodeDepthMap.get(nodeId) ?? 0;
+          const slotIndex = depthSlots.get(depth) ?? 0;
+          depthSlots.set(depth, slotIndex + 1);
           const baseColumns: LineageColumnInfo[] = Array.isArray(item.columns)
             ? item.columns.map((c): LineageColumnInfo => {
                 if (typeof c === "string") return { name: c.trim() };
@@ -241,8 +271,8 @@ export function TransformTaskDetails({
             id: nodeId,
             type: "lineageNode",
             position: {
-              x: 80 + (index % 3) * 340,
-              y: 40 + Math.floor(index / 3) * 240,
+              x: 80 + depth * 400,
+              y: 40 + slotIndex * 240,
             },
             data: {
               domain: item.domain ?? "",
@@ -254,19 +284,18 @@ export function TransformTaskDetails({
             targetPosition: Position.Left,
             draggable: true,
           };
-        }),
-    [lineageTables, attrByName, columnExpressionsByNodeId]
+        });
+    },
+    [lineageTables, attrByName, columnExpressionsByNodeId, nodeDepthMap]
   );
 
   const initialEdges: Edge[] = useMemo(() => {
     const nodeColumnsById = new Map<string, Set<string>>();
-    const nodeOrderById = new Map<string, number>();
     
     lineageTables.forEach((table) => {
       if (typeof table.table !== "string") return;
       const nodeId = getLineageNodeId(table.domain, table.table);
       const columns = Array.isArray(table.columns) ? table.columns : [];
-      nodeOrderById.set(nodeId, nodeOrderById.size);
       nodeColumnsById.set(
         nodeId,
         new Set(columns.map((c) => normalizeHandleId(typeof c === "string" ? c : (c as LineageColumnInfo).name)))
@@ -292,9 +321,9 @@ export function TransformTaskDetails({
           targetHandleCandidate && nodeColumnsById.get(target)?.has(targetHandleCandidate)
         );
         
-        const sourceOrder = nodeOrderById.get(source) ?? 0;
-        const targetOrder = nodeOrderById.get(target) ?? 0;
-        const isLeftToRight = sourceOrder <= targetOrder;
+        const sourceDepth = nodeDepthMap.get(source) ?? 0;
+        const targetDepth = nodeDepthMap.get(target) ?? 0;
+        const isLeftToRight = sourceDepth <= targetDepth;
 
         const edge: Edge = {
           id: `lineage-${index}`,
@@ -323,7 +352,7 @@ export function TransformTaskDetails({
         return edge;
       })
       .filter((e): e is Edge => e != null);
-  }, [lineageRelations, lineageTables]);
+  }, [lineageRelations, lineageTables, nodeDepthMap]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
