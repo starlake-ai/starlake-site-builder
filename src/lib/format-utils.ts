@@ -1,8 +1,6 @@
 type JsonRecord = Record<string, unknown>;
 
-/**
- * Formats a cell value for display in tables.
- */
+
 export function formatCellValue(value: unknown): string {
   if (value == null) return "";
   if (typeof value === "string" || typeof value === "number") {
@@ -18,9 +16,7 @@ export function formatCellValue(value: unknown): string {
   }
 }
 
-/**
- * Formats an attribute value for display, handling type/array conventions.
- */
+
 export function formatAttributeValue(key: string, attr: JsonRecord): string {
   const value = attr[key];
   if (key === "type" || key === "columnType") {
@@ -31,10 +27,7 @@ export function formatAttributeValue(key: string, attr: JsonRecord): string {
   return formatCellValue(value);
 }
 
-/**
- * Derives column keys from an array of attribute records for table display.
- * Orders columns: name/identifier first, then type, array, rest, then comment last.
- */
+
 export function getAttributeKeys(attributes: JsonRecord[]): string[] {
   if (attributes.length === 0) return [];
 

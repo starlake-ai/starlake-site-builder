@@ -1,31 +1,20 @@
 "use client";
 
-import {
-  SchemaNode,
-  normalizeHandleId,
-} from "@/components/schema-node";
+import { FlowGraph } from "@/components/flow-graph";
 import {
   formatAttributeValue,
   getAttributeKeys,
 } from "@/lib/format-utils";
+import {
+  buildNodeColumnsMap,
+  computeNodeDepthMap,
+  computeNodePosition,
+  createStyledEdge,
+} from "@/lib/graph-layout";
 import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useState } from "react";
 import type { Edge, Node } from "reactflow";
-import ReactFlow, {
-  Background,
-  Controls,
-  MarkerType,
-  Position,
-  useEdgesState,
-  useNodesState,
-} from "reactflow";
-import "reactflow/dist/style.css";
-import { Maximize2, Minimize2 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Position } from "reactflow";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -63,10 +52,6 @@ interface RelationLink {
   relationType?: string;
 }
 
-const relationNodeTypes = {
-  relationNode: SchemaNode,
-};
-
 export function TableDetails({
   tableName,
   tableJson,
@@ -74,7 +59,6 @@ export function TableDetails({
 }: TableDetailsProps) {
   const TAB_STORAGE_KEY = "load-details-tab";
   const [activeTab, setActiveTab] = useState<TabId>("general");
-  const [relationsMaximized, setRelationsMaximized] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -137,165 +121,90 @@ export function TableDetails({
   );
   const hasRelationsData = relationItems.length > 0;
 
-  const nodeDepthMap = useMemo(() => {
-    const depth = new Map<string, number>();
-    relationItems.forEach((item) => {
-      if (typeof item.id !== "string") return;
-      depth.set(item.id, 0);
-    });
-    let changed = true;
-    while (changed) {
-      changed = false;
-      relationLinks.forEach((rel) => {
-        if (typeof rel?.source !== "string" || typeof rel?.target !== "string") return;
-        const sourceNodeId = rel.source.split(".").slice(0, 2).join(".");
-        const targetNodeId = rel.target.split(".").slice(0, 2).join(".");
-        if (!sourceNodeId || !targetNodeId || sourceNodeId === targetNodeId) return;
-        const fromD = depth.get(sourceNodeId) ?? 0;
-        const toD = depth.get(targetNodeId) ?? 0;
-        if (toD <= fromD) {
-          depth.set(targetNodeId, fromD + 1);
-          changed = true;
-        }
-      });
-    }
-    return depth;
-  }, [relationItems, relationLinks]);
 
-  const initialNodes: Node[] = useMemo(
-    () => {
-      const depthSlots = new Map<number, number>();
-      return relationItems
-        .filter((item): item is Required<Pick<RelationItem, "id" | "label">> & RelationItem =>
+  const validItems = useMemo(
+    () =>
+      relationItems.filter(
+        (item): item is Required<Pick<RelationItem, "id" | "label">> & RelationItem =>
           typeof item?.id === "string" && typeof item?.label === "string"
-        )
-        .map((item) => {
-          const { domain, table } = getDomainAndTable(item.id);
-          const depth = nodeDepthMap.get(item.id) ?? 0;
-          const slotIndex = depthSlots.get(depth) ?? 0;
-          depthSlots.set(depth, slotIndex + 1);
-          return {
-            id: item.id,
-            type: "relationNode",
-            position: {
-              x: 80 + depth * 400,
-              y: 40 + slotIndex * 240,
-            },
-            data: {
-              domain,
-              table: table || item.label,
-              columns: (item.columns ?? [])
-                .filter((c): c is RelationColumn & { name: string } => typeof c?.name === "string")
-                .map((c) => ({
-                  name: c.name,
-                  primaryKey: c.primaryKey === true,
-                  foreignKey: c.foreignKey === true,
-                })),
-            },
-            sourcePosition: Position.Right,
-            targetPosition: Position.Left,
-            draggable: true,
-          };
-        });
-    },
-    [relationItems, nodeDepthMap]
+      ),
+    [relationItems]
   );
 
-  const initialEdges: Edge[] = useMemo(() => {
-    const nodeColumnsById = new Map<string, Set<string>>();
+  const nodeDepthMap = useMemo(() => {
+    const nodeIds = validItems.map((item) => item.id);
+    const relations = relationLinks
+      .filter((r) => typeof r?.source === "string" && typeof r?.target === "string")
+      .map((r) => ({
+        sourceId: r.source!.split(".").slice(0, 2).join("."),
+        targetId: r.target!.split(".").slice(0, 2).join("."),
+      }));
+    return computeNodeDepthMap(nodeIds, relations);
+  }, [validItems, relationLinks]);
 
-    relationItems.forEach((item) => {
-      if (typeof item.id !== "string") return;
-      const columns = Array.isArray(item.columns) ? item.columns : [];
-      nodeColumnsById.set(
-        item.id,
-        new Set(columns.filter((c): c is RelationColumn & { name: string } => typeof c?.name === "string").map((c) => normalizeHandleId(c.name)))
-      );
+  const initialNodes: Node[] = useMemo(() => {
+    const depthSlots = new Map<number, number>();
+    return validItems.map((item) => {
+      const { domain, table } = getDomainAndTable(item.id);
+      const depth = nodeDepthMap.get(item.id) ?? 0;
+      const slotIndex = depthSlots.get(depth) ?? 0;
+      depthSlots.set(depth, slotIndex + 1);
+      return {
+        id: item.id,
+        type: "schemaNode",
+        position: computeNodePosition(depth, slotIndex),
+        data: {
+          domain,
+          table: table || item.label,
+          columns: (item.columns ?? [])
+            .filter((c): c is RelationColumn & { name: string } => typeof c?.name === "string")
+            .map((c) => ({
+              name: c.name,
+              primaryKey: c.primaryKey === true,
+              foreignKey: c.foreignKey === true,
+            })),
+        },
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+        draggable: true,
+      };
     });
+  }, [validItems, nodeDepthMap]);
 
-    return relationLinks
-      .filter((relation) => typeof relation?.source === "string" && typeof relation?.target === "string")
-      .map((relation, index) => {
-        const sourceParts = relation.source!.split(".");
-        const targetParts = relation.target!.split(".");
-        
-        const sourceNodeId = sourceParts.slice(0, 2).join(".");
-        const targetNodeId = targetParts.slice(0, 2).join(".");
-        
-        const sourceColumn = sourceParts[2];
-        const targetColumn = targetParts[2];
+  const nodeColumnsById = useMemo(
+    () =>
+      buildNodeColumnsMap(
+        validItems.map((item) => ({
+          nodeId: item.id,
+          columns: (item.columns ?? [])
+            .filter((c): c is RelationColumn & { name: string } => typeof c?.name === "string")
+            .map((c) => c.name),
+        }))
+      ),
+    [validItems]
+  );
 
-        const sourceHandleCandidate = normalizeHandleId(sourceColumn);
-        const targetHandleCandidate = normalizeHandleId(targetColumn);
-
-        const sourceHasHandle = Boolean(
-          sourceHandleCandidate && nodeColumnsById.get(sourceNodeId)?.has(sourceHandleCandidate)
-        );
-        const targetHasHandle = Boolean(
-          targetHandleCandidate && nodeColumnsById.get(targetNodeId)?.has(targetHandleCandidate)
-        );
-
-        const sourceDepth = nodeDepthMap.get(sourceNodeId) ?? 0;
-        const targetDepth = nodeDepthMap.get(targetNodeId) ?? 0;
-        const isLeftToRight = sourceDepth <= targetDepth;
-
-        const edge: Edge = {
-          id: `relation-${index}`,
-          source: sourceNodeId,
-          target: targetNodeId,
-          label: relation.relationType,
-          type: "default",
-          style: {
-            stroke: "#777",
-            strokeWidth: 2,
-            strokeDasharray: "5,5",
-          },
-          labelStyle: {
-            fill: "rgb(var(--foreground))",
-            fontSize: 10,
-            fontWeight: 600,
-          },
-          labelBgStyle: {
-            fill: "rgb(var(--background))",
-            fillOpacity: 0.8,
-          },
-          markerStart: "url(#lineage-dot)",
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: "#777",
-          },
-        };
-
-        if (sourceHasHandle) {
-          edge.sourceHandle = `${isLeftToRight ? "s-r" : "s-l"}:${sourceHandleCandidate}`;
-        }
-        if (targetHasHandle) {
-          edge.targetHandle = `${isLeftToRight ? "t-l" : "t-r"}:${targetHandleCandidate}`;
-        }
-
-        return edge;
-      });
-  }, [relationLinks, relationItems, nodeDepthMap]);
-
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const [fullscreenReady, setFullscreenReady] = useState(false);
-
-  useEffect(() => {
-    setNodes(initialNodes);
-  }, [initialNodes, setNodes]);
-
-  useEffect(() => {
-    setEdges(initialEdges);
-  }, [initialEdges, setEdges]);
-
-  useEffect(() => {
-    if (relationsMaximized) {
-      const timer = setTimeout(() => setFullscreenReady(true), 350);
-      return () => { clearTimeout(timer); setFullscreenReady(false); };
-    }
-    setFullscreenReady(false);
-  }, [relationsMaximized]);
+  const initialEdges: Edge[] = useMemo(
+    () =>
+      relationLinks
+        .filter((r) => typeof r?.source === "string" && typeof r?.target === "string")
+        .map((relation, index) => {
+          const sourceParts = relation.source!.split(".");
+          const targetParts = relation.target!.split(".");
+          return createStyledEdge({
+            index,
+            sourceNodeId: sourceParts.slice(0, 2).join("."),
+            targetNodeId: targetParts.slice(0, 2).join("."),
+            sourceColumn: sourceParts[2],
+            targetColumn: targetParts[2],
+            nodeColumnsById,
+            nodeDepthMap,
+            label: relation.relationType,
+          });
+        })
+        .filter((e): e is Edge => e != null),
+    [relationLinks, nodeColumnsById, nodeDepthMap]
+  );
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -419,151 +328,14 @@ export function TableDetails({
               No relations found for this table.
             </p>
           ) : (
-            <>
-              {/* Define custom markers for ReactFlow edges (only when not maximized so id is unique) */}
-              {!relationsMaximized && (
-                <svg style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }} aria-hidden>
-                  <defs>
-                    <marker
-                      id="lineage-dot"
-                      viewBox="0 0 10 10"
-                      refX="5"
-                      refY="5"
-                      markerWidth="4"
-                      markerHeight="4"
-                      orient="auto-start-reverse"
-                    >
-                      <circle cx="5" cy="5" r="4" fill="#777" />
-                    </marker>
-                  </defs>
-                </svg>
-              )}
-
-              {!relationsMaximized && (
-                <div className="h-[700px] w-full overflow-hidden rounded-3xl border border-border/60 bg-background/50 backdrop-blur-sm shadow-2xl transition-all duration-300 hover:border-border/80 relative">
-                  <ReactFlow
-                    nodes={nodes}
-                    edges={edges}
-                    nodeTypes={relationNodeTypes}
-                    onNodesChange={onNodesChange}
-                    onEdgesChange={onEdgesChange}
-                    fitView
-                    minZoom={0.2}
-                    maxZoom={1.5}
-                    proOptions={{ hideAttribution: true }}
-                    style={{
-                      background: "transparent",
-                      color: "rgb(var(--foreground))",
-                    }}
-                  >
-                    <Background />
-                    <Controls showInteractive={false} className="bg-background! border-border/50! shadow-xl! rounded-lg overflow-hidden">
-                      <button
-                        type="button"
-                        onClick={() => setRelationsMaximized(true)}
-                        className="react-flow__controls-button react-flow__controls-maximize"
-                        title="Maximize relations"
-                        aria-label="Maximize relations"
-                      >
-                        <Maximize2 className="size-4" />
-                      </button>
-                    </Controls>
-                  </ReactFlow>
-                </div>
-              )}
-              <Dialog open={relationsMaximized} onOpenChange={setRelationsMaximized}>
-                <DialogContent
-                  showCloseButton={false}
-                  className="fixed inset-0 top-0 left-0 right-0 bottom-0 translate-x-0 translate-y-0 w-screen min-w-full h-dvh max-w-none rounded-none border-0 p-0 gap-0 flex flex-col bg-background sm:max-w-none"
-                  style={{ "--tw-enter-scale": "1", "--tw-exit-scale": "1" } as React.CSSProperties}
-                >
-                  <DialogTitle className="sr-only">
-                    Relations — full screen
-                  </DialogTitle>
-                  <div className="flex items-center justify-between shrink-0 px-4 py-2 border-b border-border/60 bg-muted/30">
-                    <span className="text-sm font-semibold">Relations — full screen</span>
-                    <button
-                      type="button"
-                      onClick={() => setRelationsMaximized(false)}
-                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                      aria-label="Exit full screen"
-                    >
-                      <Minimize2 className="size-4" />
-                      <span>Exit full screen</span>
-                    </button>
-                  </div>
-                  <div className="flex-1 min-h-0 w-full relative">
-                    {/* Define markers inside the Dialog so edges in the portal resolve url(#lineage-dot) in the same DOM subtree */}
-                    <svg style={{ position: "absolute", width: 0, height: 0, overflow: "hidden", pointerEvents: "none" }} aria-hidden>
-                      <defs>
-                        <marker
-                          id="lineage-dot"
-                          viewBox="0 0 10 10"
-                          refX="5"
-                          refY="5"
-                          markerWidth="4"
-                          markerHeight="4"
-                          orient="auto-start-reverse"
-                        >
-                          <circle cx="5" cy="5" r="4" fill="#777" />
-                        </marker>
-                      </defs>
-                    </svg>
-                    {fullscreenReady && (
-                      <ReactFlow
-                        key="relations-fullscreen"
-                        nodes={nodes}
-                        edges={edges}
-                        nodeTypes={relationNodeTypes}
-                        onNodesChange={onNodesChange}
-                        onEdgesChange={onEdgesChange}
-                        fitView
-                        fitViewOptions={{ padding: 0.2 }}
-                        minZoom={0.2}
-                        maxZoom={1.5}
-                        proOptions={{ hideAttribution: true }}
-                        style={{
-                          background: "transparent",
-                          color: "rgb(var(--foreground))",
-                        }}
-                      >
-                        <Background />
-                        <Controls showInteractive={false} className="bg-background! border-border/50! shadow-xl! rounded-lg overflow-hidden">
-                          <button
-                            type="button"
-                            onClick={() => setRelationsMaximized(false)}
-                            className="react-flow__controls-button react-flow__controls-maximize"
-                            title="Exit full screen"
-                            aria-label="Exit full screen"
-                          >
-                            <Minimize2 className="size-4" />
-                          </button>
-                        </Controls>
-                      </ReactFlow>
-                    )}
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </>
+            <FlowGraph
+              nodes={initialNodes}
+              edges={initialEdges}
+              title="Relations"
+            />
           )}
         </div>
       )}
-      <style jsx global>{`
-        .react-flow__node:focus,
-        .react-flow__node:focus-visible,
-        .react-flow__node.selected,
-        .react-flow__node-default.selectable:focus,
-        .react-flow__node-default.selectable.selected {
-          outline: none !important;
-          box-shadow: none !important;
-        }
-        /* Maximize button icon: always black on white control panel */
-        .react-flow__controls-button.react-flow__controls-maximize svg {
-          color: #111 !important;
-          stroke: #111 !important;
-          fill: none !important;
-        }
-      `}</style>
     </div>
   );
 }
@@ -576,4 +348,3 @@ function getDomainAndTable(itemId?: string): { domain: string; table: string } {
     table: table || "",
   };
 }
-

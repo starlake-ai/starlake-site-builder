@@ -1,130 +1,30 @@
-import { existsSync, readFileSync, readdirSync } from "fs";
-import path from "path";
+import { createMetadataLoader, type ItemInfo } from "./metadata-loader";
 
-function getTasksDir(): string | null {
-  const base = process.env.SITE_BASE_PATH;
-  if (!base) return null;
-  return path.join(base, "tasks");
-}
+const loader = createMetadataLoader({
+  dataDir: "tasks",
+  indexFileName: "tasks.json",
+  relationsDir: "tasks-lineage",
+  relationsSuffix: "-lineage",
+});
 
-function getTasksLineageDir(): string | null {
-  const base = process.env.SITE_BASE_PATH;
-  if (!base) return null;
-  return path.join(base, "tasks-lineage");
-}
-
-export interface TaskInfo {
-  name: string;
-  filePath: string;
-}
+export type TaskInfo = ItemInfo;
 
 export interface TransformDomainInfo {
   name: string;
   tasks: TaskInfo[];
 }
 
-interface TasksJsonItem {
-  name?: string;
-  [key: string]: unknown;
-}
-
 export function getTransformDomains(): TransformDomainInfo[] {
-  const tasksDir = getTasksDir();
-  if (!tasksDir || !existsSync(tasksDir)) {
-    if (!process.env.SITE_BASE_PATH) {
-      console.warn("SITE_BASE_PATH environment variable is not set");
-    } else {
-      console.warn(`Tasks directory not found: ${tasksDir}`);
-    }
-    return [];
-  }
-
-  const tasksJsonPath = path.join(tasksDir, "tasks.json");
-  if (!existsSync(tasksJsonPath)) {
-    console.warn(`tasks.json not found: ${tasksJsonPath}`);
-    return [];
-  }
-
-  let domainNames: string[] = [];
-  try {
-    const raw = readFileSync(tasksJsonPath, "utf-8");
-    const data = JSON.parse(raw) as TasksJsonItem[] | TasksJsonItem;
-    const list = Array.isArray(data) ? data : [data];
-    domainNames = list
-      .map((item) => item.name)
-      .filter((n): n is string => typeof n === "string");
-  } catch (e) {
-    console.warn("Failed to parse tasks.json:", e);
-    return [];
-  }
-
-  const files = readdirSync(tasksDir);
-  const result: TransformDomainInfo[] = domainNames
-    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
-    .map((domainName) => {
-      const prefix = `${domainName}.`;
-      const suffix = ".json";
-      const taskFiles = files.filter(
-        (f) =>
-          f !== "tasks.json" &&
-          f.startsWith(prefix) &&
-          f.endsWith(suffix) &&
-          f.length > prefix.length + suffix.length
-      );
-      const tasks: TaskInfo[] = taskFiles
-        .map((f) => {
-          const base = f.slice(0, -suffix.length);
-          const taskName = base.slice(prefix.length);
-          return {
-            name: taskName,
-            filePath: path.join(tasksDir, f),
-          };
-        })
-        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
-      return { name: domainName, tasks };
-    });
-
-  return result;
+  return loader.getDomains().map((d) => ({ name: d.name, tasks: d.items }));
 }
 
 export function getTransformDomain(
   domainName: string
 ): TransformDomainInfo | null {
-  const domains = getTransformDomains();
-  return domains.find((d) => d.name === domainName) ?? null;
+  const d = loader.getDomain(domainName);
+  return d ? { name: d.name, tasks: d.items } : null;
 }
 
-export function getTaskJson(
-  domainName: string,
-  taskName: string
-): Record<string, unknown> | null {
-  const domain = getTransformDomain(domainName);
-  if (!domain) return null;
-  const task = domain.tasks.find((t) => t.name === taskName);
-  if (!task || !existsSync(task.filePath)) return null;
-  try {
-    const raw = readFileSync(task.filePath, "utf-8");
-    return JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
+export const getTaskJson = loader.getItemJson;
 
-export function getTaskLineageJson(
-  domainName: string,
-  taskName: string
-): Record<string, unknown> | null {
-  const tasksLineageDir = getTasksLineageDir();
-  if (!tasksLineageDir || !existsSync(tasksLineageDir)) return null;
-
-  const fileName = `${domainName}.${taskName}-lineage.json`;
-  const filePath = path.join(tasksLineageDir, fileName);
-  if (!existsSync(filePath)) return null;
-
-  try {
-    const raw = readFileSync(filePath, "utf-8");
-    return JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
+export const getTaskLineageJson = loader.getRelationsJson;

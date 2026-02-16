@@ -1,34 +1,27 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useTheme } from "next-themes";
-import { cn } from "@/lib/utils";
+import { FlowGraph } from "@/components/flow-graph";
+import {
+  normalizeHandleId,
+} from "@/components/schema-node";
 import {
   formatAttributeValue,
   getAttributeKeys,
 } from "@/lib/format-utils";
 import {
-  SchemaNode,
-  normalizeHandleId,
-} from "@/components/schema-node";
-import { Copy, Check, Maximize2, Minimize2 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import CodeMirror from "@uiw/react-codemirror";
+  buildNodeColumnsMap,
+  computeNodeDepthMap,
+  computeNodePosition,
+  createStyledEdge,
+} from "@/lib/graph-layout";
+import { cn } from "@/lib/utils";
 import { sql as sqlLang } from "@codemirror/lang-sql";
-import ReactFlow, {
-  Background,
-  Controls,
-  MarkerType,
-  Position,
-  useEdgesState,
-  useNodesState,
-} from "reactflow";
+import CodeMirror from "@uiw/react-codemirror";
+import { Check, Copy } from "lucide-react";
+import { useTheme } from "next-themes";
+import { useEffect, useMemo, useState } from "react";
 import type { Edge, Node } from "reactflow";
-import "reactflow/dist/style.css";
+import { Position } from "reactflow";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -72,16 +65,11 @@ interface LineageRelation {
   expression?: string;
 }
 
-/** Node id for lineage: "domain.table" when domain is set, else "table" (for intermediate/CTE tables). */
 function getLineageNodeId(domain: string | undefined, table: string | undefined): string {
   if (typeof table !== "string") return "";
   if (typeof domain === "string" && domain.trim() !== "") return `${domain}.${table}`;
   return table;
 }
-
-const lineageNodeTypes = {
-  lineageNode: SchemaNode,
-};
 
 export function TransformTaskDetails({
   taskName,
@@ -91,7 +79,6 @@ export function TransformTaskDetails({
   const TAB_STORAGE_KEY = "transform-details-tab";
   const [activeTab, setActiveTab] = useState<TabId>("general");
   const [copied, setCopied] = useState(false);
-  const [lineageMaximized, setLineageMaximized] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -161,6 +148,7 @@ export function TransformTaskDetails({
 
   const hasLineageData = lineageTables.length > 0;
 
+
   const columnExpressionsByNodeId = useMemo(() => {
     const map = new Map<string, Map<string, string[]>>();
     const add = (nodeId: string, column: string | undefined, expression: string | undefined) => {
@@ -202,177 +190,119 @@ export function TransformTaskDetails({
     return m;
   }, [attributes]);
 
-  const nodeDepthMap = useMemo(() => {
-    const depth = new Map<string, number>();
-    lineageTables.forEach((table) => {
-      if (typeof table.table !== "string") return;
-      const nodeId = getLineageNodeId(table.domain, table.table);
-      depth.set(nodeId, 0);
-    });
-    let changed = true;
-    while (changed) {
-      changed = false;
-      lineageRelations.forEach((rel) => {
-        if (!rel?.from?.table || !rel?.to?.table) return;
-        const fromId = getLineageNodeId(rel.from?.domain, rel.from?.table);
-        const toId = getLineageNodeId(rel.to?.domain, rel.to?.table);
-        if (!fromId || !toId || fromId === toId) return;
-        const fromD = depth.get(fromId) ?? 0;
-        const toD = depth.get(toId) ?? 0;
-        if (toD <= fromD) {
-          depth.set(toId, fromD + 1);
-          changed = true;
-        }
-      });
-    }
-    return depth;
-  }, [lineageTables, lineageRelations]);
 
-  const initialNodes: Node[] = useMemo(
-    () => {
-      const depthSlots = new Map<number, number>();
-      return lineageTables
-        .filter((item): item is LineageTable & { table: string } => typeof item?.table === "string")
-        .map((item) => {
-          const nodeId = getLineageNodeId(item.domain, item.table);
-          const depth = nodeDepthMap.get(nodeId) ?? 0;
-          const slotIndex = depthSlots.get(depth) ?? 0;
-          depthSlots.set(depth, slotIndex + 1);
-          const baseColumns: LineageColumnInfo[] = Array.isArray(item.columns)
-            ? item.columns.map((c): LineageColumnInfo => {
-                if (typeof c === "string") return { name: c.trim() };
-                const obj = c as LineageColumnInfo & { name?: string };
-                return {
-                  name: (obj.name ?? String(c)).trim(),
-                  primaryKey: obj.primaryKey === true,
-                  foreignKey: obj.foreignKey === true,
-                };
-              })
-            : [];
-          const enrichedColumns = baseColumns.map((col) => {
-            const fromAttr = attrByName.get(col.name.toLowerCase());
-            if (fromAttr && (!col.primaryKey && !col.foreignKey)) {
-              return {
-                ...col,
-                primaryKey: fromAttr.primaryKey ?? col.primaryKey,
-                foreignKey: fromAttr.foreignKey ?? col.foreignKey,
-              };
-            }
-            return col;
-          });
-          const columnExpressions: Record<string, string[]> = {};
-          const colMap = columnExpressionsByNodeId.get(nodeId);
-          if (colMap) {
-            colMap.forEach((exprs, colKey) => {
-              columnExpressions[colKey] = exprs;
-            });
-          }
-          return {
-            id: nodeId,
-            type: "lineageNode",
-            position: {
-              x: 80 + depth * 400,
-              y: 40 + slotIndex * 240,
-            },
-            data: {
-              domain: item.domain ?? "",
-              table: item.table,
-              columns: enrichedColumns,
-              columnExpressions: Object.keys(columnExpressions).length > 0 ? columnExpressions : undefined,
-            },
-            sourcePosition: Position.Right,
-            targetPosition: Position.Left,
-            draggable: true,
-          };
-        });
-    },
-    [lineageTables, attrByName, columnExpressionsByNodeId, nodeDepthMap]
+  const validTables = useMemo(
+    () =>
+      lineageTables.filter(
+        (item): item is LineageTable & { table: string } => typeof item?.table === "string"
+      ),
+    [lineageTables]
   );
 
-  const initialEdges: Edge[] = useMemo(() => {
-    const nodeColumnsById = new Map<string, Set<string>>();
-    
-    lineageTables.forEach((table) => {
-      if (typeof table.table !== "string") return;
-      const nodeId = getLineageNodeId(table.domain, table.table);
-      const columns = Array.isArray(table.columns) ? table.columns : [];
-      nodeColumnsById.set(
-        nodeId,
-        new Set(columns.map((c) => normalizeHandleId(typeof c === "string" ? c : (c as LineageColumnInfo).name)))
-      );
+  const nodeDepthMap = useMemo(() => {
+    const nodeIds = validTables.map((t) => getLineageNodeId(t.domain, t.table));
+    const relations = lineageRelations
+      .filter((r) => typeof r?.from?.table === "string" && typeof r?.to?.table === "string")
+      .map((r) => ({
+        sourceId: getLineageNodeId(r.from?.domain, r.from?.table),
+        targetId: getLineageNodeId(r.to?.domain, r.to?.table),
+      }));
+    return computeNodeDepthMap(nodeIds, relations);
+  }, [validTables, lineageRelations]);
+
+  const initialNodes: Node[] = useMemo(() => {
+    const depthSlots = new Map<number, number>();
+    return validTables.map((item) => {
+      const nodeId = getLineageNodeId(item.domain, item.table);
+      const depth = nodeDepthMap.get(nodeId) ?? 0;
+      const slotIndex = depthSlots.get(depth) ?? 0;
+      depthSlots.set(depth, slotIndex + 1);
+
+      const baseColumns: LineageColumnInfo[] = Array.isArray(item.columns)
+        ? item.columns.map((c): LineageColumnInfo => {
+            if (typeof c === "string") return { name: c.trim() };
+            const obj = c as LineageColumnInfo & { name?: string };
+            return {
+              name: (obj.name ?? String(c)).trim(),
+              primaryKey: obj.primaryKey === true,
+              foreignKey: obj.foreignKey === true,
+            };
+          })
+        : [];
+
+      const enrichedColumns = baseColumns.map((col) => {
+        const fromAttr = attrByName.get(col.name.toLowerCase());
+        if (fromAttr && !col.primaryKey && !col.foreignKey) {
+          return {
+            ...col,
+            primaryKey: fromAttr.primaryKey ?? col.primaryKey,
+            foreignKey: fromAttr.foreignKey ?? col.foreignKey,
+          };
+        }
+        return col;
+      });
+
+      const columnExpressions: Record<string, string[]> = {};
+      const colMap = columnExpressionsByNodeId.get(nodeId);
+      if (colMap) {
+        colMap.forEach((exprs, colKey) => {
+          columnExpressions[colKey] = exprs;
+        });
+      }
+
+      return {
+        id: nodeId,
+        type: "schemaNode",
+        position: computeNodePosition(depth, slotIndex),
+        data: {
+          domain: item.domain ?? "",
+          table: item.table,
+          columns: enrichedColumns,
+          columnExpressions:
+            Object.keys(columnExpressions).length > 0 ? columnExpressions : undefined,
+        },
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+        draggable: true,
+      };
     });
+  }, [validTables, nodeDepthMap, attrByName, columnExpressionsByNodeId]);
 
-    return lineageRelations
-      .filter(
-        (relation) =>
-          typeof relation?.from?.table === "string" && typeof relation?.to?.table === "string"
-      )
-      .map((relation, index) => {
-        const source = getLineageNodeId(relation.from?.domain, relation.from?.table);
-        const target = getLineageNodeId(relation.to?.domain, relation.to?.table);
-        if (!source || !target) return null;
-        const sourceHandleCandidate = normalizeHandleId(relation.from?.column);
-        const targetHandleCandidate = normalizeHandleId(relation.to?.column);
-        
-        const sourceHasHandle = Boolean(
-          sourceHandleCandidate && nodeColumnsById.get(source)?.has(sourceHandleCandidate)
-        );
-        const targetHasHandle = Boolean(
-          targetHandleCandidate && nodeColumnsById.get(target)?.has(targetHandleCandidate)
-        );
-        
-        const sourceDepth = nodeDepthMap.get(source) ?? 0;
-        const targetDepth = nodeDepthMap.get(target) ?? 0;
-        const isLeftToRight = sourceDepth <= targetDepth;
+  const nodeColumnsById = useMemo(
+    () =>
+      buildNodeColumnsMap(
+        validTables.map((item) => ({
+          nodeId: getLineageNodeId(item.domain, item.table),
+          columns: Array.isArray(item.columns)
+            ? item.columns.map((c) =>
+                typeof c === "string" ? c : (c as LineageColumnInfo).name
+              )
+            : [],
+        }))
+      ),
+    [validTables]
+  );
 
-        const edge: Edge = {
-          id: `lineage-${index}`,
-          source,
-          target,
-          type: "default",
-          style: {
-            stroke: "#777",
-            strokeWidth: 2,
-            strokeDasharray: "5,5",
-          },
-          markerStart: "url(#lineage-dot)",
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: "#777",
-          },
-        };
-
-        if (sourceHasHandle && sourceHandleCandidate) {
-          edge.sourceHandle = `${isLeftToRight ? "s-r" : "s-l"}:${sourceHandleCandidate}`;
-        }
-        if (targetHasHandle && targetHandleCandidate) {
-          edge.targetHandle = `${isLeftToRight ? "t-l" : "t-r"}:${targetHandleCandidate}`;
-        }
-
-        return edge;
-      })
-      .filter((e): e is Edge => e != null);
-  }, [lineageRelations, lineageTables, nodeDepthMap]);
-
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const [fullscreenReady, setFullscreenReady] = useState(false);
-
-  useEffect(() => {
-    setNodes(initialNodes);
-  }, [initialNodes, setNodes]);
-
-  useEffect(() => {
-    setEdges(initialEdges);
-  }, [initialEdges, setEdges]);
-
-  useEffect(() => {
-    if (lineageMaximized) {
-      const timer = setTimeout(() => setFullscreenReady(true), 350);
-      return () => { clearTimeout(timer); setFullscreenReady(false); };
-    }
-    setFullscreenReady(false);
-  }, [lineageMaximized]);
+  const initialEdges: Edge[] = useMemo(
+    () =>
+      lineageRelations
+        .filter(
+          (r) => typeof r?.from?.table === "string" && typeof r?.to?.table === "string"
+        )
+        .map((relation, index) =>
+          createStyledEdge({
+            index,
+            sourceNodeId: getLineageNodeId(relation.from?.domain, relation.from?.table),
+            targetNodeId: getLineageNodeId(relation.to?.domain, relation.to?.table),
+            sourceColumn: relation.from?.column,
+            targetColumn: relation.to?.column,
+            nodeColumnsById,
+            nodeDepthMap,
+          })
+        )
+        .filter((e): e is Edge => e != null),
+    [lineageRelations, nodeColumnsById, nodeDepthMap]
+  );
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -494,7 +424,6 @@ export function TransformTaskDetails({
                       setCopied(true);
                       setTimeout(() => setCopied(false), 2000);
                     } catch {
-                      // fallback ignored
                     }
                   }}
                   className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -535,6 +464,7 @@ export function TransformTaskDetails({
           )}
         </div>
       )}
+
       {activeTab === "lineage" && (
         <div className="space-y-4">
           {!lineageJson || !hasLineageData ? (
@@ -542,147 +472,16 @@ export function TransformTaskDetails({
               No lineage found for this task.
             </p>
           ) : (
-            <>
-              {/* Define custom markers for ReactFlow edges */}
-              <svg style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}>
-                <defs>
-                  <marker
-                    id="lineage-dot"
-                    viewBox="0 0 10 10"
-                    refX="5"
-                    refY="5"
-                    markerWidth="4"
-                    markerHeight="4"
-                    orient="auto-start-reverse"
-                  >
-                    <circle cx="5" cy="5" r="4" fill="#777" />
-                  </marker>
-                </defs>
-              </svg>
-
-              {!lineageMaximized && (
-                <div className="h-[700px] w-full overflow-hidden rounded-3xl border border-border/60 bg-background/50 backdrop-blur-sm shadow-2xl transition-all duration-300 hover:border-border/80 relative">
-                  <ReactFlow
-                    nodes={nodes}
-                    edges={edges}
-                    nodeTypes={lineageNodeTypes}
-                    onNodesChange={onNodesChange}
-                    onEdgesChange={onEdgesChange}
-                    fitView
-                    minZoom={0.2}
-                    maxZoom={1.5}
-                    proOptions={{ hideAttribution: true }}
-                    style={{
-                      background: "transparent",
-                      color: "rgb(var(--foreground))",
-                    }}
-                  >
-                    <Background />
-                    <Controls showInteractive={false} className="bg-background! border-border/50! shadow-xl! rounded-lg overflow-hidden">
-                      <button
-                        type="button"
-                        onClick={() => setLineageMaximized(true)}
-                        className="react-flow__controls-button react-flow__controls-maximize"
-                        title="Maximize lineage"
-                        aria-label="Maximize lineage"
-                      >
-                        <Maximize2 className="size-4" />
-                      </button>
-                    </Controls>
-                  </ReactFlow>
-                </div>
-              )}
-              <Dialog open={lineageMaximized} onOpenChange={setLineageMaximized}>
-                <DialogContent
-                  showCloseButton={false}
-                  className="fixed inset-0 top-0 left-0 right-0 bottom-0 translate-x-0 translate-y-0 w-screen min-w-full h-dvh max-w-none rounded-none border-0 p-0 gap-0 flex flex-col bg-background sm:max-w-none"
-                  style={{ "--tw-enter-scale": "1", "--tw-exit-scale": "1" } as React.CSSProperties}
-                >
-                  <DialogTitle className="sr-only">
-                    Lineage — full screen
-                  </DialogTitle>
-                  <div className="flex items-center justify-between shrink-0 px-4 py-2 border-b border-border/60 bg-muted/30">
-                    <span className="text-sm font-semibold">Lineage — full screen</span>
-                    <button
-                      type="button"
-                      onClick={() => setLineageMaximized(false)}
-                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                      aria-label="Exit full screen"
-                    >
-                      <Minimize2 className="size-4" />
-                      <span>Exit full screen</span>
-                    </button>
-                  </div>
-                  <div className="flex-1 min-h-0 w-full relative">
-                    {/* Define markers inside the Dialog so edges in the portal resolve url(#lineage-dot) in the same DOM subtree */}
-                    <svg style={{ position: "absolute", width: 0, height: 0, overflow: "hidden", pointerEvents: "none" }} aria-hidden>
-                      <defs>
-                        <marker
-                          id="lineage-dot"
-                          viewBox="0 0 10 10"
-                          refX="5"
-                          refY="5"
-                          markerWidth="4"
-                          markerHeight="4"
-                          orient="auto-start-reverse"
-                        >
-                          <circle cx="5" cy="5" r="4" fill="#777" />
-                        </marker>
-                      </defs>
-                    </svg>
-                    {fullscreenReady && (
-                      <ReactFlow
-                        nodes={nodes}
-                        edges={edges}
-                        nodeTypes={lineageNodeTypes}
-                        onNodesChange={onNodesChange}
-                        onEdgesChange={onEdgesChange}
-                        fitView
-                        fitViewOptions={{ padding: 0.2 }}
-                        minZoom={0.2}
-                        maxZoom={1.5}
-                        proOptions={{ hideAttribution: true }}
-                        style={{
-                          background: "transparent",
-                          color: "rgb(var(--foreground))",
-                        }}
-                      >
-                        <Background />
-                        <Controls showInteractive={false} className="bg-background! border-border/50! shadow-xl! rounded-lg overflow-hidden">
-                          <button
-                            type="button"
-                            onClick={() => setLineageMaximized(false)}
-                            className="react-flow__controls-button react-flow__controls-maximize"
-                            title="Exit full screen"
-                            aria-label="Exit full screen"
-                          >
-                            <Minimize2 className="size-4" />
-                          </button>
-                        </Controls>
-                      </ReactFlow>
-                    )}
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </>
+            <FlowGraph
+              nodes={initialNodes}
+              edges={initialEdges}
+              title="Lineage"
+            />
           )}
         </div>
       )}
+
       <style jsx global>{`
-        .react-flow__node:focus,
-        .react-flow__node:focus-visible,
-        .react-flow__node.selected,
-        .react-flow__node-default.selectable:focus,
-        .react-flow__node-default.selectable.selected {
-          outline: none !important;
-          box-shadow: none !important;
-        }
-        /* Maximize button icon: always black on white control panel */
-        .react-flow__controls-button.react-flow__controls-maximize svg {
-          color: #111 !important;
-          stroke: #111 !important;
-          fill: none !important;
-        }
         .cm-editor, .cm-scroller {
           background-color: transparent !important;
         }
@@ -701,22 +500,15 @@ export function TransformTaskDetails({
 
 function formatWriteStrategy(value: unknown): string | undefined {
   if (value == null) return undefined;
-
   if (typeof value === "string") return value;
-
   if (typeof value === "object") {
     const obj = value as { type?: unknown; [key: string]: unknown };
-    if (typeof obj.type === "string") {
-      return obj.type;
-    }
+    if (typeof obj.type === "string") return obj.type;
     try {
       return JSON.stringify(value);
     } catch {
       return String(value);
     }
   }
-
   return String(value);
 }
-
-

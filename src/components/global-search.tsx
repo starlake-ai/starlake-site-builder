@@ -58,7 +58,7 @@ export function GlobalSearch() {
           `/api/search?q=${encodeURIComponent(query)}`
         );
         const data = await response.json();
-        setResults(data.getResults || data.results || []);
+        setResults(data.results || []);
       } catch (error) {
         console.error("Search error:", error);
         setResults([]);
